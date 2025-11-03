@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8080:8080"
+    environment:
+      - ANALYTICS_URL=http://analytics:8000
+    depends_on:
+      - analytics
+
+  analytics:
+    build: ./analytics
+    ports:
+      - "8000:8000"
+
+  client:
+    build: ./client
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
