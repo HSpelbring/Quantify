@@ -14,6 +14,7 @@ func main() {
 	router.Use(cors.Default())
 	api.RegisterRoutes(router)
 
+	db.InitDB()
 	log.Println("Starting Go backend on port 8080...")
 	router.Run(":8080")
 }
