@@ -32,5 +32,10 @@ Functionalities
 - Later: Sentiment scores - NTLK or other better libraries
 
 
-
+Potential Color Schemes
+000000
+0C1821
+1B2A41
+324A5F
+CCC9DC
 

@@ -47,3 +47,6 @@ Thumbs.db
 *.SQLite
 *.sqlite3
 /backend/data/
+
+# Node Modules
+/client/node_modules/

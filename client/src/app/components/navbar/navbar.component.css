@@ -1,0 +1,68 @@
+.sidebar {
+  position: relative;
+  height: 100%;
+  width: 70px;
+  background-color: #1e1e1e;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  transition: width 0.3s ease;
+  overflow: hidden;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3);
+  border-right: 1px solid #333;
+}
+
+/* Keep consistent height and expand overlay-style */
+.sidebar:hover {
+  width: 200px;
+}
+
+/* Prevent vertical size jump */
+.sidebar ul {
+  list-style: none;
+  padding: 0;
+  margin: 80px 0 0 0;
+  flex-grow: 1;
+  width: 100%;
+}
+
+.sidebar li {
+  width: 100%;
+}
+
+.sidebar a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 20px;
+  color: #ddd;
+  text-decoration: none;
+  transition: background 0.2s, color 0.2s;
+  font-size: 18px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.sidebar a:hover,
+.sidebar a.active {
+  background-color: #333;
+  color: #fff;
+}
+
+.emoji {
+  width: 30px;
+  text-align: center;
+  font-size: 22px;
+}
+
+.label {
+  opacity: 0;
+  white-space: nowrap;
+  transition: opacity 0.3s ease;
+}
+
+.sidebar:hover .label {
+  opacity: 1;
+}
