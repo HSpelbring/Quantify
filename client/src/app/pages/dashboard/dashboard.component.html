@@ -1,0 +1,34 @@
+<div class="dashboard">
+
+  <!-- Right-side stack -->
+  <div class="right-side">
+
+    <div class="portfolio-box box">
+      <h2>Portfolio Overview</h2>
+      <div class="price">
+        <span class="amount">{{ portfolio.price | currency:'USD' }}</span>
+        <span class="change" [class.up]="portfolio.change > 0" [class.down]="portfolio.change < 0">
+          {{ portfolio.change > 0 ? '+' : '' }}{{ portfolio.change }}%
+        </span>
+      </div>
+
+      <canvas id="portfolioChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Bottom Slideshow -->
+  <div class="fund-ticker">
+    <div class="ticker-track">
+      <div class="fund" *ngFor="let fund of funds">
+        <div class="fund-info">
+          <span class="fund-name">{{ fund.name }}</span>
+          <span class="fund-price" [class.up]="fund.change > 0" [class.down]="fund.change < 0">
+            {{ fund.price | currency:'USD' }} ({{ fund.change > 0 ? '+' : '' }}{{ fund.change }}%)
+          </span>
+        </div>
+        <div class="fund-chart">📈 5D Chart</div>
+      </div>
+    </div>
+  </div>
+
+</div>

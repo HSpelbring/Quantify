@@ -36,7 +36,7 @@ import { HttpClient } from '@angular/common/http';
     .content {
       flex: 1;
       overflow: hidden; /* ✅ prevent scrolling here */
-      padding: 40px;
+      padding: 10px;
       position: relative;
       z-index: 1;
     }

@@ -1,0 +1,52 @@
+.settings-page {
+  color: #fff;
+  background-color: #181818;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding-top: 4px;         /* 🔼 right up near top */
+  padding-left: 45px;       /* 🔼 tighter to navbar */
+  box-sizing: border-box;
+}
+
+.api-status-box {
+  background-color: #1f1f1f;
+  border-radius: 8px;
+  padding: 12px 14px;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
+  width: 200px;             /* 🔽 smaller width */
+  margin-top: 2px;          /* 🔼 nearly flush with top */
+}
+
+.api-status-box h2 {
+  font-size: 0.95rem;
+  margin-bottom: 6px;
+  color: #ccc;
+}
+
+.api-status-box table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.api-status-box td {
+  padding: 3px 5px;
+  font-size: 11px;
+  color: #bbb;
+  text-align: left;
+}
+
+.status-dot {
+  display: inline-block;
+  height: 7px;
+  width: 7px;
+  border-radius: 50%;
+  background-color: red;
+}
+
+.status-dot.active {
+  background-color: #4CAF50;
+}

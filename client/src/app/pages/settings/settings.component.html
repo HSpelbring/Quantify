@@ -1,0 +1,14 @@
+<div class="settings-page">
+  <h1>⚙️ Settings</h1>
+  <div class="api-status-box">
+    <h2>API Status</h2>
+    <table>
+      <tr *ngFor="let api of apis">
+        <td class="api-name">{{ api.name }}</td>
+        <td>
+          <span class="status-dot" [class.active]="api.active"></span>
+        </td>
+      </tr>
+    </table>
+  </div>
+</div>
