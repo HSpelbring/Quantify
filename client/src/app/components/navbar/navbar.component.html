@@ -1,14 +1,8 @@
-<nav class="sidebar">
-  <div class="top-icon">
-    <span class="emoji">💹</span>
+<nav class="navbar" [class.expanded]="expanded">
+  <div class="nav-items">
+    <a *ngFor="let page of pages" [routerLink]="page.route" class="nav-link" routerLinkActive="active">
+      <div class="nav-icon" [attr.data-icon]="page.icon"></div>
+      <span *ngIf="expanded" class="nav-label">{{ page.name }}</span>
+    </a>
   </div>
-
-  <ul>
-    <li *ngFor="let page of pages">
-      <a [routerLink]="page.route" routerLinkActive="active">
-        <span class="emoji">{{ page.emoji }}</span>
-        <span class="label">{{ page.name }}</span>
-      </a>
-    </li>
-  </ul>
 </nav>

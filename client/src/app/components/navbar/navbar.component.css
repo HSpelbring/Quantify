@@ -83,3 +83,38 @@
 .sidebar:hover .top-icon {
   background-color: #222;
 }
+
+.nav-icon {
+  margin-right: 8px;
+  min-width: 24px;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.nav-link:hover .nav-icon {
+  color: #4CAF50;
+  transform: scale(1.1);
+}
+
+.navbar {
+  width: var(--navbar-width, 70px);
+  transition: width 0.3s ease;
+  overflow: hidden;
+}
+
+.nav-label {
+  color: #ddd;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+i-lucide {
+  width: 22px;
+  height: 22px;
+  color: #dcdcdc;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.nav-link:hover i-lucide {
+  color: #4CAF50;
+  transform: scale(1.1);
+}
