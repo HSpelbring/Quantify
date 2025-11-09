@@ -16,19 +16,32 @@
     </div>
   </div>
 
-  <!-- Bottom Slideshow -->
   <div class="fund-ticker">
     <div class="ticker-track">
-      <div class="fund" *ngFor="let fund of funds">
+      <!-- Original set -->
+      <div class="fund" *ngFor="let fund of funds; let i = index">
         <div class="fund-info">
           <span class="fund-name">{{ fund.name }}</span>
           <span class="fund-price" [class.up]="fund.change > 0" [class.down]="fund.change < 0">
             {{ fund.price | currency:'USD' }} ({{ fund.change > 0 ? '+' : '' }}{{ fund.change }}%)
           </span>
         </div>
-        <div class="fund-chart">📈 5D Chart</div>
+        <canvas class="fund-chart" [id]="'fundChart' + i"></canvas>
+        <div class="divider"></div> <!-- Always include divider -->
+      </div>
+
+      <!-- Duplicate for seamless loop -->
+      <div class="fund" *ngFor="let fund of funds; let i = index">
+        <div class="fund-info">
+          <span class="fund-name">{{ fund.name }}</span>
+          <span class="fund-price" [class.up]="fund.change > 0" [class.down]="fund.change < 0">
+            {{ fund.price | currency:'USD' }} ({{ fund.change > 0 ? '+' : '' }}{{ fund.change }}%)
+          </span>
+        </div>
+        <canvas class="fund-chart" [id]="'fundChartDuplicate' + i"></canvas>
+        <!-- only hide the very last divider overall -->
+        <div class="divider" *ngIf="!(i === funds.length - 1)"></div>
       </div>
     </div>
   </div>
-
 </div>

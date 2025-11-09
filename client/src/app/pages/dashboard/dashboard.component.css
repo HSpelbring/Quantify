@@ -211,3 +211,101 @@ p {
     height: 75px;
   }
 }
+
+.divider {
+  position: absolute;
+  right: 0;
+  top: 10%;
+  bottom: 10%;
+  width: 1px;
+  background-color: #444;
+}
+
+.up {
+  color: #4CAF50;
+}
+
+.down {
+  color: #F44336;
+}
+
+.fund-ticker {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 80px; 
+  background-color: #121212;
+  border-top: 1px solid #333;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 6px 0;
+}
+
+.ticker-track {
+  display: flex;
+  width: max-content;
+  height: 100%;
+  justify-content: space-evenly;
+  align-items: center;
+  animation: scrollLeft 40s linear infinite;
+}
+
+.fund {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 250px;
+  height: 100%;
+  position: relative;
+  padding: 0 10px;
+  box-sizing: border-box;
+}
+
+.fund-info {
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.2;
+  height: 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-bottom: 0;
+}
+
+.fund-chart {
+  width: 100%;
+  height: 40px; 
+  margin-top: 0;
+}
+
+.divider {
+  position: absolute;
+  right: 0;
+  top: 10%;
+  bottom: 10%;
+  width: 1px;
+  background-color: #333;
+}
+
+.up {
+  color: #4CAF50;
+}
+
+.down {
+  color: #F44336;
+}
+
+@keyframes scrollTicker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
