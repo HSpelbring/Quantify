@@ -1,94 +1,85 @@
-import { NgFor, CurrencyPipe, CommonModule } from '@angular/common';
 import { Component, AfterViewInit } from '@angular/core';
 import { Chart } from 'chart.js/auto';
+import { NgFor, CurrencyPipe } from '@angular/common';
+
+interface Fund {
+  symbol: string;
+  name: string;
+  price: number;
+  change: number;
+  data: number[];
+}
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [NgFor, CurrencyPipe, CommonModule],
+  imports: [NgFor, CurrencyPipe],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.css']
 })
 export class DashboardComponent implements AfterViewInit {
-  portfolio = { price: 15000432.76, change: 1.72 };
-
-  funds = [
-    { name: 'NASDAQ (NDX)', price: 17385.42, change: 0.82 },
-    { name: 'DOW JONES (DJI)', price: 38645.21, change: -0.24 },
-    { name: 'S&P 500 (INX)', price: 5122.08, change: 0.15 },
-    { name: 'RUSSELL 2000 (RUT)', price: 1923.75, change: 1.04 },
-    { name: 'Bitcoin (BTC)', price: 100000, change: -0.56 },
-    { name: 'VBOE Index (VIX)', price: 22.34, change: 2.13 }
+    portfolio = {
+        price: 15000,
+        change: 2.5
+    };
+  
+    funds: Fund[] = [
+    { symbol: 'RUT', name: 'RUSSELL 2000', price: 1950.2, change: 1.2, data: [0, 2, 3, 2, 4] },
+    { symbol: 'BTC', name: 'BITCOIN', price: 37150.5, change: -0.8, data: [4, 3, 2, 1, 2] },
+    { symbol: 'VIX', name: 'VBOE Index', price: 17.3, change: -1.1, data: [3, 3, 2, 4, 1] },
+    { symbol: 'NDX', name: 'NASDAQ', price: 15800.7, change: 0.9, data: [1, 2, 3, 4, 5] },
+    { symbol: 'DJI', name: 'DOW JONES', price: 36000.1, change: 1.4, data: [2, 3, 3, 4, 3] },
+    { symbol: 'INX', name: 'S&P 500', price: 4550.3, change: 0.7, data: [2, 2, 3, 2, 4] }
   ];
 
-  ngAfterViewInit() {
-    this.createPortfolioChart();
-    this.createFundCharts();
+  private charts: Chart[] = [];
+
+  ngAfterViewInit(): void {
+  // Wait until DOM is ready
+    setTimeout(() => this.initializeCharts(), 300);
   }
 
-  private createPortfolioChart() {
-    const canvas = document.getElementById('portfolioChart') as HTMLCanvasElement;
-    if (!canvas) return;
+  initializeCharts(): void {
+    const totalRepeats = 3; // matches the [0,1,2] repeat sets in HTML
 
+    for (let repeat = 0; repeat < totalRepeats; repeat++) {
+      this.funds.forEach((fund, i) => {
+        const canvasId = `fundChart${repeat}_${i}`;
+        const canvas = document.getElementById(canvasId) as HTMLCanvasElement;
+        if (canvas) this.createChart(canvas, fund);
+      });
+    }
+  }
+
+  createChart(canvas: HTMLCanvasElement, fund: Fund): void {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    // Destroy old chart if exists
+    const existing = Chart.getChart(canvas);
+    if (existing) existing.destroy();
 
     new Chart(ctx, {
       type: 'line',
       data: {
-        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-        datasets: [{
-          data: [15000, 15120, 15200, 15350, 15432],
-          borderColor: '#4CAF50',
-          borderWidth: 2,
-          tension: 0.3,
-          fill: {
-            target: 'origin',
-            above: 'rgba(76, 175, 80, 0.15)',
+        labels: fund.data.map((_, i) => i.toString()),
+        datasets: [
+          {
+            data: fund.data,
+            borderColor: fund.change > 0 ? '#4CAF50' : '#F44336',
+            borderWidth: 2,
+            fill: false,
+            tension: 0.4,
           },
-          pointRadius: 0
-        }]
+        ],
       },
       options: {
+        responsive: false,
+        maintainAspectRatio: false,
+        elements: { point: { radius: 0 } },
         plugins: { legend: { display: false } },
-        scales: { x: { display: false }, y: { display: false } }
-      }
+        scales: { x: { display: false }, y: { display: false } },
+      },
     });
-  }
-
-  private createFundCharts() {
-    const total = this.funds.length * 2; // original + duplicate
-    for (let i = 0; i < total; i++) {
-      const index = i % this.funds.length;
-      const fund = this.funds[index];
-      const canvas = document.getElementById(`fundChart${i < this.funds.length ? i : 'Duplicate' + index}`) as HTMLCanvasElement;
-      if (!canvas) continue;
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) continue;
-
-      const data = Array.from({ length: 10 }, () => fund.price * (1 + (Math.random() - 0.5) / 100));
-
-      new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: data.map((_, j) => j.toString()),
-          datasets: [{
-            data,
-            borderColor: fund.change > 0 ? '#4CAF50' : '#F44336',
-            borderWidth: 1.5,
-            tension: 0.3,
-            pointRadius: 0,
-            fill: false
-          }]
-        },
-        options: {
-          plugins: { legend: { display: false } },
-          scales: { x: { display: false }, y: { display: false } },
-          responsive: true,
-          maintainAspectRatio: false
-        }
-      });
-    }
   }
 }
