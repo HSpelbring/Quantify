@@ -1,20 +1,23 @@
 package main
 
 import (
+	"backend/internal/api"
+	"backend/internal/db"
 	"log"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"backend/internal/api"
 )
 
 func main() {
 	router := gin.Default()
-
-	// Register routes from internal/api/routes.go
 	router.Use(cors.Default())
-	api.RegisterRoutes(router)
+	err := db.InitDB()
+	if err != nil {
+		log.Fatalf("❌ Failed to initialize database: %v", err)
+	}
 
-	db.InitDB()
+	api.RegisterRoutes(router)
 	log.Println("Starting Go backend on port 8080...")
 	router.Run(":8080")
 }

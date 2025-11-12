@@ -11,6 +11,8 @@ import (
 
 // RegisterRoutes sets up the API routes for the Gin router.
 func RegisterRoutes(router *gin.Engine) {
+	router.Use(cors.Default())
+	
 	// Health check route
 	router.GET("/api/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "Go backend is alive!"})
@@ -28,5 +30,9 @@ func RegisterRoutes(router *gin.Engine) {
 
 		body, _ := io.ReadAll(resp.Body)
 		c.Data(http.StatusOK, "application/json", body)
+	})
+
+	router.GET("/api/funds", func(c *gin.Context) {
+		HandleFunds(c.Writer, c.Request)
 	})
 }
