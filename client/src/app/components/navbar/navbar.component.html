@@ -1,8 +1,16 @@
-<nav class="navbar" [class.expanded]="expanded">
-  <div class="nav-items">
-    <a *ngFor="let page of pages" [routerLink]="page.route" class="nav-link" routerLinkActive="active">
-      <div class="nav-icon" [attr.data-icon]="page.icon"></div>
-      <span *ngIf="expanded" class="nav-label">{{ page.name }}</span>
-    </a>
-  </div>
+<nav class="sidebar">
+  <div class="top-icon">☰</div>
+
+  <ul>
+    <li *ngFor="let page of pages">
+      <a [routerLink]="page.route" routerLinkActive="active">
+        <img
+          [src]="'/assets/images/' + page.icon"
+          [alt]="page.name"
+          class="nav-icon"
+        />
+        <span class="label">{{ page.name }}</span>
+      </a>
+    </li>
+  </ul>
 </nav>

@@ -1,25 +1,24 @@
 import { Component, HostListener, ElementRef, AfterViewInit } from '@angular/core';
-import { RouterModule } from '@angular/router';
+import { RouterModule, RouterLink, RouterLinkActive } from '@angular/router';
 import { NgFor, NgIf } from '@angular/common';
 import { icons } from 'lucide';
 
 @Component({
   selector: 'app-navbar',
   standalone: true,
-  imports: [RouterModule, NgFor, NgIf],
+  imports: [RouterModule, NgFor, NgIf, RouterLink, RouterLinkActive],
   templateUrl: './navbar.component.html',
   styleUrls: ['./navbar.component.css']
 })
 export class NavbarComponent implements AfterViewInit {
-    expanded = false;
-
+  expanded = false;
   pages = [
-    { icon: 'home', name: 'Dashboard', route: '/dashboard' },
-    { icon: 'search', name: 'Lookup', route: '/lookup' },
-    { icon: 'briefcase', name: 'Portfolio', route: '/portfolio' },
-    { icon: 'brain', name: 'Insights', route: '/insights' },
-    { icon: 'newspaper', name: 'News', route: '/news' },
-    { icon: 'settings', name: 'Settings', route: '/settings' }
+    { name: 'Dashboard', route: '/dashboard', icon: 'warehouse.png' },
+    { name: 'Portfolio', route: '/portfolio', icon: 'briefcase.png' },
+    { name: 'Lookup', route: '/lookup', icon: 'search.png' },
+    { name: 'Insights', route: '/insights', icon: 'brain.png' },
+    { name: 'News', route: '/news', icon: 'newspaper.png' },
+    { name: 'Settings', route: '/settings', icon: 'settings.png' }
   ];
 
   constructor(private el: ElementRef) {}
