@@ -1,0 +1,111 @@
+GET /api/funds
+
+{
+  "timestamp": "2025-11-13T15:00:00Z",
+  "funds": [
+    { "symbol": "SPY", "price": 674.23, "change": -0.84 },
+    { "symbol": "QQQ", "price": 611.27, "change": -1.58 },
+    { "symbol": "BTC-USD", "price": 101330.8, "change": -0.33 }
+  ]
+}
+
+GET /api/fund/:symbol
+
+{
+  "symbol": "AAPL",
+  "price": 229.65,
+  "change": -0.42,
+  "volume": 51230000,
+  "market_cap": 3.54e12,
+  "pe_ratio": 34.2,
+  "eps": 6.7,
+  "sector": "Technology",
+  "last_updated": "2025-11-13T15:02:00Z"
+}
+
+GET /api/fundamentals/:symbol
+
+{
+  "symbol": "TSLA",
+  "market_cap": 812_000_000_000,
+  "pe_ratio": 42.5,
+  "eps": 3.2,
+  "dividend_yield": 0.0,
+  "book_value": 12.5,
+  "debt_to_equity": 0.43,
+  "updated_at": "2025-11-13T10:00:00Z"
+}
+
+GET /api/history/:symbol?range=1mo
+
+{
+  "symbol": "AAPL",
+  "range": "1mo",
+  "interval": "1d",
+  "data": [
+    { "date": "2025-10-13", "open": 215.0, "close": 218.4, "high": 220.1, "low": 214.8, "volume": 60234000 },
+    { "date": "2025-10-14", "open": 218.4, "close": 217.2, "high": 219.3, "low": 216.8, "volume": 49812000 }
+  ]
+}
+
+GET /api/eod
+
+{
+  "date": "2025-11-12",
+  "eod": [
+    { "symbol": "SPY", "close": 674.23, "change": -0.84 },
+    { "symbol": "QQQ", "close": 611.27, "change": -1.58 },
+    { "symbol": "BTC-USD", "close": 101330.8, "change": -0.33 }
+  ]
+}
+
+GET /api/insight/:symbol
+
+{
+  "symbol": "AAPL",
+  "volatility": 0.32,
+  "momentum_score": 78.2,
+  "sentiment": "positive",
+  "prediction": {
+    "direction": "up",
+    "confidence": 0.72
+  }
+}
+
+GET /api/health
+
+{
+  "status": "ok",
+  "services": {
+    "cache": "active",
+    "db": "connected",
+    "python_microservice": "running",
+    "apis": {
+      "finnhub": "online",
+      "fmp": "online",
+      "yahoo": "online"
+    }
+  },
+  "uptime": "1h42m"
+}
+
+GET /api/stats/cache
+
+{
+  "hits": 132,
+  "misses": 48,
+  "entries": 92,
+  "memory_usage_mb": 11.4
+}
+
+POST /internal/cache/purge
+
+{ "status": "cleared", "count": 92 }
+
+POST /internal/sync/historical
+
+{ "status": "success", "symbols_updated": 25 }
+
+POST /internal/refresh
+
+{ "status": "ok", "refreshed": ["SPY", "QQQ", "BTC-USD"] }
