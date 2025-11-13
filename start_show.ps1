@@ -7,4 +7,4 @@ Start-Process powershell -ArgumentList "cd backend; go run cmd/server/main.go"
 Start-Sleep -Seconds 3
 
 # Run Angular frontend last (port 4200)
-Start-Process powershell -ArgumentList "cd client; ng serve --open"
+Start-Process powershell -ArgumentList "cd client; ng serve --open --proxy-config proxy.conf.json"

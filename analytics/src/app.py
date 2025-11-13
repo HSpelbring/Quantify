@@ -66,7 +66,7 @@ def get_quotes():
                     latest = df["Close"].iloc[-1]
                     prev = df["Close"].iloc[-2]
                     pct = round(((latest - prev) / prev) * 100, 2)
-                    results[s] = {"price": round(float(latest), 2), "change": pct}
+                    results[s] = {"price": round(float(latest), 2), "change": float(pct)}
                     print(f"   ✅ Success via CSV: {s} = {latest} ({pct}%)")
             else:
                 print(f"   ❌ CSV fetch failed for {s}: {r.status_code}")

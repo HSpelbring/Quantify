@@ -1,9 +1,9 @@
 package api
 
 import (
-	"net/http"
-	"io"
+	"backend/internal/fetch"
 	"log"
+	"net/http"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -12,7 +12,7 @@ import (
 // RegisterRoutes sets up the API routes for the Gin router.
 func RegisterRoutes(router *gin.Engine) {
 	router.Use(cors.Default())
-	
+
 	// Health check route
 	router.GET("/api/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "Go backend is alive!"})
@@ -27,12 +27,23 @@ func RegisterRoutes(router *gin.Engine) {
 			return
 		}
 		defer resp.Body.Close()
-
-		body, _ := io.ReadAll(resp.Body)
-		c.Data(http.StatusOK, "application/json", body)
+		c.DataFromReader(http.StatusOK, resp.ContentLength, "application/json", resp.Body, nil)
 	})
 
 	router.GET("/api/funds", func(c *gin.Context) {
-		HandleFunds(c.Writer, c.Request)
+		// Use cached results if available
+		if funds, found := fetch.GetCachedFunds(); found {
+			c.JSON(http.StatusOK, funds)
+			return
+		}
+
+		funds, err := fetch.FetchFunds()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		fetch.CacheFunds(funds)
+		c.JSON(http.StatusOK, funds)
 	})
 }
