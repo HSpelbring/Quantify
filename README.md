@@ -35,13 +35,16 @@ to ensure flexibility, scalability, and clear separation of concerns.
 ```bash
 cd Quantify/client
 ng serve --open
+```
 
 #### 2 Analytics
 ```bash
 cd Quantify/analytics/src
 python app.py
+```
 
 #### 3 Backend
 ```bash
 cd Quantify/backend
 go run cmd/server/main.go
+```
