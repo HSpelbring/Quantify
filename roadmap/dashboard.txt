@@ -1,6 +1,6 @@
 To Add/Fix:
 - Main App Logo
 - Graph (Add Dashed Line to show starting day value)
-- Store Values to Improve Graph
+- Store Values to Improve Graph (day graph)
 - Animated background
 - Toggleable Portfolio Overview

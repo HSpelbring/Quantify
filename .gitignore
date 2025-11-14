@@ -1,1 +1,82 @@
-node_modules
+############################################################
+# ROOT .gitignore for Quantify (Angular + Python + Go)
+############################################################
+
+############################
+# Compiled / Build Outputs
+############################
+dist/
+tmp/
+out-tsc/
+bazel-out/
+coverage/
+libpeerconnection.log
+testem.log
+typings/
+__screenshots__/
+
+############################
+# Node / Angular
+############################
+node_modules/
+client/node_modules/
+.angular/
+.angular/cache/
+npm-debug.log
+yarn-error.log
+
+############################
+# IDEs / Editors
+############################
+.idea/
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/*
+
+############################
+# Python
+############################
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment folders (optional but smart)
+venv/
+env/
+.venv/
+
+# FastAPI data or analytics local storage
+analytics/**/__pycache__/
+analytics/**/*.pyc
+
+############################
+# Databases
+############################
+*.db
+*.SQLite
+*.sqlite3
+backend/data/
+
+############################
+# OS / System files
+############################
+.DS_Store
+Thumbs.db
+
+############################
+# Misc
+############################
+connect.lock
+sass-cache/
