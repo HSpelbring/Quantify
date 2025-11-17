@@ -1,9 +1,6 @@
 package fetch
 
-import (
-	"log"
-	"time"
-)
+import "time"
 
 type Fund struct {
 	Symbol string  `json:"symbol"`
@@ -25,35 +22,53 @@ var tracked = []struct {
 }
 
 func FetchFunds() ([]Fund, error) {
-	// Check cache first
-	if list, ok := GetCachedFunds(); ok {
-		return list, nil
+	// CHECK CACHE AGE
+	cached, ts, ok := GetCachedFunds()
+	if ok {
+		age := time.Since(ts)
+		if age < 5*time.Minute {
+			// Fresh — return cached version
+			return cached, nil
+		}
 	}
 
-	funds := []Fund{}
-	for _, s := range tracked {
-		data, err := FetchYahoo(s.Symbol)
+	// Otherwise fetch fresh data
+	result := []Fund{}
 
-		if err != nil || data.Price == 0 {
-			log.Printf("⚠️ Yahoo failed for %s, trying Finnhub...", s.Symbol)
+	for _, t := range tracked {
+		sym := t.Symbol
 
-			price, change, ferr := FetchFinnhubQuote(s.Symbol)
-			if ferr != nil {
-				log.Printf("❌ Finnhub also failed for %s: %v", s.Symbol, ferr)
-				continue // skip this symbol completely
-			}
-
-			data.Price = price
-			data.Change = change
+		// Try full robust FetchFund() logic
+		f, err := FetchFund(sym)
+		if err == nil && f.Price > 0 {
+			f.Name = t.Name
+			result = append(result, f)
+			continue
 		}
 
-		data.Name = s.Name
-		funds = append(funds, data)
+		// Fallback to previous cached item (if exists)
+		if ok {
+			for _, old := range cached {
+				if old.Symbol == sym {
+					result = append(result, old)
+					goto next
+				}
+			}
+		}
 
-		// Be nice to the APIs
-		time.Sleep(300 * time.Millisecond)
+		// Last resort: placeholder
+		result = append(result, Fund{
+			Symbol: sym,
+			Name:   t.Name,
+			Price:  0,
+			Change: 0,
+		})
+
+	next:
 	}
 
-	CacheFunds(funds)
-	return funds, nil
+	// UPDATE CACHE
+	CacheFunds(result)
+
+	return result, nil
 }

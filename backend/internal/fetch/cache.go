@@ -2,21 +2,26 @@ package fetch
 
 import (
 	"time"
-
-	"github.com/patrickmn/go-cache"
 )
 
-var c = cache.New(1*time.Minute, 10*time.Minute)
+type fundCache struct {
+	List      []Fund
+	Timestamp time.Time
+}
 
-func GetCachedFunds() ([]Fund, bool) {
-	if x, found := c.Get("funds"); found {
-		if list, ok := x.([]Fund); ok {
-			return list, true
-		}
+var fundsCache *fundCache
+
+// Return cache if present
+func GetCachedFunds() ([]Fund, time.Time, bool) {
+	if fundsCache == nil {
+		return nil, time.Time{}, false
 	}
-	return nil, false
+	return fundsCache.List, fundsCache.Timestamp, true
 }
 
 func CacheFunds(list []Fund) {
-	c.Set("funds", list, cache.DefaultExpiration)
+	fundsCache = &fundCache{
+		List:      list,
+		Timestamp: time.Now(),
+	}
 }

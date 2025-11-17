@@ -6,7 +6,7 @@ import { icons } from 'lucide';
 @Component({
   selector: 'app-navbar',
   standalone: true,
-  imports: [RouterModule, NgFor, NgIf, RouterLink, RouterLinkActive],
+  imports: [RouterModule, NgFor, RouterLink, RouterLinkActive],
   templateUrl: './navbar.component.html',
   styleUrls: ['./navbar.component.css']
 })

@@ -22,7 +22,7 @@ func RegisterRoutes(router *gin.Engine) {
 
 		//  All tracked funds (cached)
 		api.GET("/funds", func(c *gin.Context) {
-			if funds, found := fetch.GetCachedFunds(); found {
+			if funds, _, found := fetch.GetCachedFunds(); found {
 				c.JSON(http.StatusOK, funds)
 				return
 			}
