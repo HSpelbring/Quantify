@@ -1,13 +1,9 @@
 package fetch
 
-import "time"
-
-type Fund struct {
-	Symbol string  `json:"symbol"`
-	Name   string  `json:"name"`
-	Price  float64 `json:"price"`
-	Change float64 `json:"change"`
-}
+import (
+	"backend/internal/models"
+	"time"
+)
 
 var tracked = []struct {
 	Symbol string
@@ -21,7 +17,7 @@ var tracked = []struct {
 	{"BTC-USD", "Bitcoin"},
 }
 
-func FetchFunds() ([]Fund, error) {
+func FetchFunds() ([]models.Fund, error) {
 	// CHECK CACHE AGE
 	cached, ts, ok := GetCachedFunds()
 	if ok {
@@ -33,7 +29,7 @@ func FetchFunds() ([]Fund, error) {
 	}
 
 	// Otherwise fetch fresh data
-	result := []Fund{}
+	result := []models.Fund{}
 
 	for _, t := range tracked {
 		sym := t.Symbol
@@ -57,7 +53,7 @@ func FetchFunds() ([]Fund, error) {
 		}
 
 		// Last resort: placeholder
-		result = append(result, Fund{
+		result = append(result, models.Fund{
 			Symbol: sym,
 			Name:   t.Name,
 			Price:  0,

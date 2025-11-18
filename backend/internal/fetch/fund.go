@@ -1,13 +1,14 @@
 package fetch
 
 import (
+	"backend/internal/models"
 	"errors"
 	"math"
 	"strings"
 )
 
-func FetchFund(symbol string) (Fund, error) {
-	var fd Fund
+func FetchFund(symbol string) (models.Fund, error) {
+	var fd models.Fund
 
 	if symbol == "" {
 		return fd, errors.New("symbol required")

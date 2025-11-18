@@ -20,6 +20,27 @@ QUOTE_CACHE_TIME = 0
 CACHE_TTL = 10  # seconds
 
 FINNHUB_KEY = os.getenv("FINNHUB_API_KEY")
+
+def get_intraday_history(symbol: str):
+    """
+    Returns today's 1-minute close prices as a list of floats.
+    Used for sparkline intraday graphs.
+    """
+    try:
+        ticker = yf.Ticker(symbol)
+        hist = ticker.history(period="1d", interval="1m")["Close"]
+
+        if hist.empty:
+            return []
+
+        hist = hist.fillna(method="ffill")
+
+        # Guarantee conversion to normal Python floats
+        return [float(x) for x in hist.tolist()]
+    except Exception as e:
+        print(f"Intraday history error for {symbol}: {e}")
+        return []
+
 def finnhub_quote(symbol: str):
     if not FINNHUB_KEY:
         print("NO FINNHUB API KEY SET")
@@ -73,80 +94,50 @@ def get_quotes():
     print("\n=== Fetching all quotes (fresh) ===")
 
     fetch_order = {
-        "^GSPC": ["^GSPC", "SPY"],
-        "^NDX": ["^NDX", "QQQ"],
-        "^DJI": ["^DJI", "DIA"],
-        "^RUT": ["^RUT"],
-        "^VIX": ["^VIX"],
-        "BTC-USD": ["BTC-USD"],
+        "^GSPC": ["SPY"],      # SPY = S&P500 intraday source
+        "^NDX": ["QQQ"],       # QQQ = NASDAQ100 intraday
+        "^DJI": ["DIA"],       # DIA = Dow intraday
+        "^RUT": ["^RUT"],      # RUT intraday exists
+        "^VIX": ["^VIX"],      # VIX intraday exists
+        "BTC-USD": ["BTC-USD"]
     }
 
     results = {}
 
-    for index_symbol, candidate_list in fetch_order.items():
+    for index_symbol, tickers in fetch_order.items():
+        primary = tickers[0]
         print(f"\n-> Fetching {index_symbol} ...")
-        success = False
 
-        # === 1. Try yfinance for each candidate ticker ===
-        for ticker in candidate_list:
-            try:
-                hist = yf.Ticker(ticker).history(period="2d", interval="1d")
-                if len(hist) >= 2:
-                    latest = hist["Close"].iloc[-1]
-                    prev = hist["Close"].iloc[-2]
-                    pct = round(((latest - prev) / prev) * 100, 2)
-
-                    results[index_symbol] = {
-                        "price": round(float(latest), 2),
-                        "change": pct,
-                    }
-                    print(f"   OK: {ticker} = {latest} ({pct}%)")
-                    success = True
-                    break
-
-            except Exception as e:
-                print(f"   ERROR: yfinance failed: {e}")
-
-        if success:
-            continue
-
-        # === 2. CSV fallback for primary ticker ===
-        primary = candidate_list[0]
-        print(f"   Trying CSV fallback for {primary} ...")
         try:
-            url = (
-                f"https://query1.finance.yahoo.com/v7/finance/download/"
-                f"{primary}?period1=0&period2=9999999999&interval=1d&events=history"
-            )
-            r = requests.get(url, timeout=10)
-            if r.status_code == 200 and "Date" in r.text:
-                df = pd.read_csv(io.StringIO(r.text))
-                if len(df) >= 2:
-                    latest = df["Close"].iloc[-1]
-                    prev = df["Close"].iloc[-2]
-                    pct = round(((latest - prev) / prev) * 100, 2)
+            # daily price movement
+            hist = yf.Ticker(primary).history(period="2d", interval="1d")
+            if len(hist) >= 2:
+                latest = hist["Close"].iloc[-1]
+                prev = hist["Close"].iloc[-2]
+                pct = round(((latest - prev) / prev) * 100, 2)
 
-                    results[index_symbol] = {
-                        "price": round(float(latest), 2),
-                        "change": pct,
-                    }
-                    print(f"   OK CSV: {primary} = {latest} ({pct}%)")
-                    continue
+                # intraday history (REAL sparkline data)
+                intra = get_intraday_history(primary)
 
-            print(f"   CSV FAILED for {primary} status={r.status_code}")
+                results[index_symbol] = {
+                    "price": round(float(latest), 2),
+                    "change": pct,
+                    "history": intra
+                }
+
+                print(f"   OK: {primary} = {latest} ({pct}%) with {len(intra)} intraday points")
+                continue
 
         except Exception as e:
-            print(f"   CSV ERROR: {e}")
+            print(f"   ERROR: {e}")
 
-        # === 3. FINAL GUARANTEED FALLBACK ===
+        # fallback:
         print(f"   FALLBACK: {index_symbol} set to 0 / 0")
-        results[index_symbol] = {"price": 0, "change": 0}
+        results[index_symbol] = {"price": 0, "change": 0, "history": []}
 
     print("\n=== Final results (fresh) ===")
     print(results)
 
-    # update cache
     QUOTE_CACHE = results
     QUOTE_CACHE_TIME = now
-
     return results

@@ -8,15 +8,10 @@ import (
 	"net/http"
 	"time"
 
+	"backend/internal/models"
+
 	"github.com/patrickmn/go-cache"
 )
-
-type Fund struct {
-	Symbol string  `json:"symbol"`
-	Name   string  `json:"name"`
-	Price  float64 `json:"price"`
-	Change float64 `json:"change"`
-}
 
 var fundCache = cache.New(1*time.Minute, 2*time.Minute)
 
@@ -32,6 +27,12 @@ var fundSymbols = []struct {
 	{"^RUT", "Russell 2000"},
 	{"^VIX", "VIX Index"},
 	{"BTC-USD", "Bitcoin"},
+}
+
+type QuoteResponse struct {
+	Price   float64   `json:"price"`
+	Change  float64   `json:"change"`
+	History []float64 `json:"history"`
 }
 
 func HandleFunds(w http.ResponseWriter, r *http.Request) {
@@ -60,22 +61,22 @@ func HandleFunds(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var raw map[string]map[string]float64
+	var raw map[string]QuoteResponse
 	if err := json.Unmarshal(body, &raw); err != nil {
 		http.Error(w, fmt.Sprintf("Parse error: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	funds := []Fund{}
+	funds := []models.Fund{}
 	for _, s := range fundSymbols {
-		price := raw[s.Symbol]["price"]
-		change := raw[s.Symbol]["change"]
+		q := raw[s.Symbol]
 
-		funds = append(funds, Fund{
-			Symbol: s.Symbol,
-			Name:   s.Name,
-			Price:  price,
-			Change: change,
+		funds = append(funds, models.Fund{
+			Symbol:  s.Symbol,
+			Name:    s.Name,
+			Price:   q.Price,
+			Change:  q.Change,
+			History: q.History,
 		})
 	}
 

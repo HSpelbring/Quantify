@@ -43,19 +43,11 @@ local_resource(
 # Helper function using argument array (Windows-safe)
 def api_cmd(name, url):
     return local_resource(
-        name="api_" + name,
+        name="API_" + name,
         cmd=["curl.exe", url],
         allow_parallel=True,
         trigger_mode=TRIGGER_MODE_MANUAL,
     )
-
-# Group header
-local_resource(
-    name="api_endpoints",
-    cmd=["echo", "API Endpoint Tools Loaded"],
-    allow_parallel=True,
-    trigger_mode=TRIGGER_MODE_MANUAL,
-)
 
 api_cmd("health",          "http://localhost:8080/api/health")
 api_cmd("funds",           "http://localhost:8080/api/funds")

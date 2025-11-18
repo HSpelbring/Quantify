@@ -1,13 +1,21 @@
 package fetch
 
 import (
+	"backend/internal/models"
 	"encoding/json"
 	"fmt"
 	"net/http"
 )
 
-func FetchYahoo(symbol string) (Fund, error) {
-	var f Fund
+// Define QuoteResponse so we can parse Python's JSON structure
+type QuoteResponse struct {
+	Price   float64   `json:"price"`
+	Change  float64   `json:"change"`
+	History []float64 `json:"history"`
+}
+
+func FetchYahoo(symbol string) (models.Fund, error) {
+	var f models.Fund
 
 	// Map ETF → Index
 	indexMap := map[string]string{
@@ -28,20 +36,19 @@ func FetchYahoo(symbol string) (Fund, error) {
 	}
 	defer resp.Body.Close()
 
-	var quotes map[string]struct {
-		Price  float64 `json:"price"`
-		Change float64 `json:"change"`
-	}
+	// NEW STRUCT FOR PARSING PYTHON
+	var quotes map[string]QuoteResponse
 
 	if err := json.NewDecoder(resp.Body).Decode(&quotes); err != nil {
 		return f, fmt.Errorf("decode: %v", err)
 	}
 
-	// Now match lookup
+	// Match the index or ETF symbol
 	if q, ok := quotes[lookup]; ok {
-		f.Symbol = symbol // preserve user-facing symbol
+		f.Symbol = symbol
 		f.Price = q.Price
 		f.Change = q.Change
+		f.History = q.History
 	}
 
 	return f, nil

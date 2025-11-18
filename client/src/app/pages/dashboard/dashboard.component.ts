@@ -8,7 +8,7 @@ interface Fund {
   name: string;
   price: number;
   change: number;
-  data: number[];
+  history: number[];   // ✅ REAL intraday sparkline data
 }
 
 @Component({
@@ -20,90 +20,81 @@ interface Fund {
 })
 export class DashboardComponent implements OnInit, AfterViewInit {
   funds: Fund[] = [];
-  portfolio = {
-    price: 15000,
-    change: 2.5
-  };
-
-  private charts: Chart[] = [];
-  private chartsInitialized = false;
+  charts: Chart[] = [];
+  portfolio: any = { price: 0, change: 0 };
 
   constructor(private fundService: FundService) {}
 
   ngOnInit(): void {
-    this.loadFundsOnce();
+    this.fundService.getFunds().subscribe((data: any) => {
+      this.funds = data;
+
+      // Example portfolio logic
+      this.portfolio.price = this.funds.reduce((a, f) => a + f.price, 0);
+      this.portfolio.change = this.funds.reduce((a, f) => a + f.change, 0);
+
+      setTimeout(() => this.initializeCharts(), 50);
+    });
   }
 
   ngAfterViewInit(): void {
-    // Nothing here — prevent duplicate fetch
-  }
-
-  private loadFundsOnce(): void {
-    this.fundService.getFunds().subscribe({
-      next: (data: any) => {
-        this.funds = data.map((f: any) => ({
-          ...f,
-          data: [0, 2, 3, 2, 4]
-        }));
-
-        if (!this.chartsInitialized) {
-          setTimeout(() => this.initializeCharts(), 300);
-          this.chartsInitialized = true;
-        } else {
-          this.refreshCharts();
-        }
-      },
-      error: (err: any) => console.error('Fund load error', err)
-    });
+    // Charts will be created after funds load
   }
 
   private initializeCharts(): void {
     this.destroyCharts();
 
-    this.funds.forEach((fund: Fund, i: number) => {
-      const canvas = document.getElementById(`fundChart0_${i}`) as HTMLCanvasElement | null;
-      if (canvas) this.createChart(canvas, fund);
-    });
-  }
+    // We duplicate ticker stream 3 times in HTML
+    for (let repeat = 0; repeat < 3; repeat++) {
+      this.funds.forEach((fund, i) => {
+        const id = `fundChart${repeat}_${i}`;
+        const canvas = document.getElementById(id) as HTMLCanvasElement;
 
-  private createChart(canvas: HTMLCanvasElement, fund: Fund): void {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+        if (!canvas) {
+          console.warn("Canvas not found:", id);
+          return;
+        }
 
-    const existing = Chart.getChart(canvas);
-    if (existing) existing.destroy();
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
 
-    const chart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: fund.data.map((_, i) => i.toString()),
-        datasets: [{
-          data: fund.data,
-          borderColor: fund.change > 0 ? '#4CAF50' : '#F44336',
-          borderWidth: 2,
-          fill: false,
-          tension: 0.4
-        }]
-      },
-      options: {
-        responsive: false,
-        maintainAspectRatio: false,
-        elements: { point: { radius: 0 } },
-        plugins: { legend: { display: false } },
-        scales: { x: { display: false }, y: { display: false } }
-      }
-    });
+        // Choose sparkline color based on positive/negative change
+        const color = fund.change >= 0 ? '#4CAF50' : '#F44336';
 
-    this.charts.push(chart);
-  }
+        const chart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: fund.history.map((_, idx) => idx),
+            datasets: [{
+              data: fund.history,
+              borderColor: color,
+              borderWidth: 2,
+              pointRadius: 0,
+              fill: false,
+              tension: 0.3,
+            }]
+          },
+          options: {
+            responsive: false,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: {
+              legend: { display: false }
+            },
+            scales: {
+              x: { display: false },
+              y: { display: false }
+            }
+          }
+        });
 
-  private refreshCharts(): void {
-    this.destroyCharts();
-    this.initializeCharts();
+        this.charts.push(chart);
+      });
+    }
   }
 
   private destroyCharts(): void {
-    this.charts.forEach((chart: Chart) => chart.destroy());
+    this.charts.forEach(chart => chart.destroy());
     this.charts = [];
   }
 }
