@@ -1,0 +1,45 @@
+       Portfolio Page
+
+A. Ability to Buy / Sell
+B. Portfolio Overview
+C. Holdings List
+D. Alerts
+
+A. Ability to Buy / sell
+- "Buy" button (choose shares/$ amount + calculate costs)
+- "Sell" button
+- Portfolio calculates change automatically
+
+DB:
+positions(user_id, symbol, quantity, avg_cost)
+transactions(user_id, symbol, type, shares, price, timestamp)
+
+B. Portfolio Overview
+- Total value
+- Total gain/loss ($ and %)
+- Daily change
+- Total invested
+- Total unrealized gain
+- Total realized gain
+- Graph Toggles: 1D/5D/1M/3M/1Y/5Y/YTD/MAX
+- Rebuild portfolio value by summing historical daily price x shares
+
+C. Holdings List
+Each Symbol:
+- Symbol & name
+- Qty owned
+- Avg cost
+- Market price
+- Gain/loss
+- Small sparkline (if possible)
+- Sector & Allocation (in settings?)
+
+D. Alerts
+- Price crosses threshold
+- Volume spikes
+- RSI overbought/oversold
+- Insider Trading
+
+DB:
+alerts(user_id, symbol, type, threshold, active)
+
