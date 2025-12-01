@@ -1,0 +1,68 @@
+<div class="portfolio-wrapper">
+
+  <!-- HEADER SUMMARY -->
+  <div class="summary-box">
+    <div class="summary-main">
+      <h1 class="value">${{ totalValue | number:'1.0-0' }}</h1>
+
+      <div
+        class="change"
+        [class.positive]="dailyChange >= 0"
+        [class.negative]="dailyChange < 0"
+      >
+        {{ dailyChange >= 0 ? '+' : '' }}{{ dailyChange | number:'1.2-2' }}
+        ({{ pctChange >= 0 ? '+' : '' }}{{ pctChange | number:'1.2-2' }}%)
+      </div>
+    </div>
+
+    <p class="subtext">Total Portfolio Value</p>
+  </div>
+
+<!-- LARGE GRAPH WITH TIMEFRAME BUTTONS INSIDE -->
+<div class="chart-container">
+
+  <div class="graph-tf-controls">
+    <button
+      *ngFor="let tf of timeframes"
+      class="tf-btn"
+      [class.active]="tf === activeTF"
+      (click)="changeTF(tf)"
+    >
+      {{ tf }}
+    </button>
+  </div>
+
+  <canvas id="portfolioChart"></canvas>
+</div>
+
+
+  <!-- BUY / SELL BUTTONS -->
+  <div class="action-row">
+    <button class="action buy" (click)="buyStock()">Buy</button>
+    <button class="action sell" (click)="sellStock()">Sell</button>
+  </div>
+
+  <!-- HOLDINGS LIST -->
+  <div class="holdings-section">
+    <h2 class="section-title">Your Holdings</h2>
+
+    <div class="holding-card" *ngFor="let h of holdings">
+      <div class="left">
+        <div class="symbol">{{ h.symbol }}</div>
+        <div class="shares">{{ h.shares }} shares @ ${{ h.avgCost }}</div>
+      </div>
+
+      <div class="right">
+        <div class="price">${{ h.price }}</div>
+        <div
+          class="change"
+          [class.positive]="h.change >= 0"
+          [class.negative]="h.change < 0"
+        >
+          {{ h.change >= 0 ? '+' : ''}}{{ h.change }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

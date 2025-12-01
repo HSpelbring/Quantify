@@ -1,0 +1,145 @@
+<div class="lookup-wrapper">
+
+  <!-- SEARCH BAR -->
+  <div class="search-section">
+    <input
+      class="search-input"
+      type="text"
+      placeholder="Search a stock (AAPL, MSFT, BTC-USD...)"
+      [(ngModel)]="query"
+    />
+    <button class="search-btn" (click)="onSearch()">Search</button>
+  </div>
+
+  <!-- PREVIOUS SEARCHES -->
+  <div class="previous-searches" *ngIf="previous.length > 0">
+    <div
+      class="search-pill"
+      *ngFor="let item of previous"
+      (click)="selectPrevious(item)"
+    >
+      {{ item }}
+    </div>
+  </div>
+
+<div class="chart-section">
+
+  <div class="chart-container">
+
+    <div class="graph-tf-controls">
+      <button
+        *ngFor="let tf of timeframes"
+        class="tf-btn"
+        [class.active]="tf === activeTF"
+        (click)="changeTimeframe(tf)"
+      >
+        {{ tf }}
+      </button>
+    </div>
+
+    <canvas id="stockChart"></canvas>
+
+  </div>
+</div>
+
+  <div class="bottom-row">
+
+  <!-- LEFT COLUMN: Details + Summary -->
+  <div class="left-column">
+
+    <div class="details-panel">
+      <h2 class="section-title">Details</h2>
+
+      <div class="details-grid">
+
+        <div class="detail-item">
+          <div class="detail-label">Symbol</div>
+          <div class="detail-value">{{ details.symbol || 'AAPL' }}</div>
+        </div>
+
+        <div class="detail-item">
+          <div class="detail-label">Price</div>
+          <div class="detail-value">{{ details.price || '$212.54' }}</div>
+        </div>
+
+        <div class="detail-item">
+          <div class="detail-label">Change</div>
+          <div class="detail-value">{{ details.change || '+1.52 (0.73%)' }}</div>
+        </div>
+
+        <div class="detail-item">
+          <div class="detail-label">Day Range</div>
+          <div class="detail-value">{{ details.dayRange || '210.44 – 213.02' }}</div>
+        </div>
+
+        <div class="detail-item">
+          <div class="detail-label">52W Range</div>
+          <div class="detail-value">{{ details.yearRange || '164 – 223' }}</div>
+        </div>
+
+        <div class="detail-item">
+          <div class="detail-label">Market Cap</div>
+          <div class="detail-value">{{ details.marketCap || '3.2T' }}</div>
+        </div>
+
+        <div class="detail-item">
+          <div class="detail-label">Volume</div>
+          <div class="detail-value">{{ details.volume || '78.1M' }}</div>
+        </div>
+
+        <div class="detail-item">
+          <div class="detail-label">Avg Volume</div>
+          <div class="detail-value">{{ details.avgVolume || '91.2M' }}</div>
+        </div>
+
+        <div class="detail-item">
+          <div class="detail-label">PE Ratio</div>
+          <div class="detail-value">{{ details.pe || '32.4' }}</div>
+        </div>
+
+        <div class="detail-item">
+          <div class="detail-label">EPS</div>
+          <div class="detail-value">{{ details.eps || '4.98' }}</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- SUMMARY BELOW DETAILS -->
+    <div class="summary-panel">
+      <h2 class="section-title">Summary</h2>
+
+      <div class="summary-item"><strong>Today's High:</strong> {{ details.high || '—' }}</div>
+      <div class="summary-item"><strong>Today's Low:</strong> {{ details.low || '—' }}</div>
+      <div class="summary-item"><strong>Open:</strong> {{ details.open || '—' }}</div>
+      <div class="summary-item"><strong>Prev Close:</strong> {{ details.prevClose || '—' }}</div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  <div class="side-panels">
+
+    <div class="watchlist-panel">
+      <h2 class="section-title">Watchlist</h2>
+
+      <div class="watch-item" *ngFor="let w of watchlist">
+        <span class="star">★</span>
+        <span class="ticker">{{ w.symbol }}</span>
+        <span class="mini-price">{{ w.price }}</span>
+      </div>
+    </div>
+
+    <div class="history-panel">
+      <h2 class="section-title">Recent</h2>
+
+      <div class="history-item" *ngFor="let h of history">
+        {{ h.symbol }} — {{ h.when }}
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+  </div>

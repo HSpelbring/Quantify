@@ -123,8 +123,8 @@ i-lucide {
   position: fixed;
   left: 0;
   top: 0;
-  bottom: 75px;
-  height: calc(100vh - 75px);
+  bottom: var(--ticker-height, 0px);
+  height: calc(100vh - var(--ticker-height, 0px));
   width: 70px;
   background-color: #1e1e1e;
   color: #fff;
