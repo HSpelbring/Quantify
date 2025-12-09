@@ -8,6 +8,7 @@ interface Fund {
   name: string;
   price: number;
   change: number;
+  open: number;
   history: number[];   // ✅ REAL intraday sparkline data
 }
 
@@ -23,15 +24,15 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   charts: Chart[] = [];
   portfolio: any = { price: 0, change: 0 };
 
-  constructor(private fundService: FundService) {}
+  constructor(private fundService: FundService) { }
 
   ngOnInit(): void {
     this.fundService.getFunds().subscribe((data: any) => {
       this.funds = data;
 
       // Example portfolio logic
-      this.portfolio.price = this.funds.reduce((a, f) => a + f.price, 0);
-      this.portfolio.change = this.funds.reduce((a, f) => a + f.change, 0);
+      this.portfolio.price = this.funds.reduce((a: number, f: Fund) => a + f.price, 0);
+      this.portfolio.change = this.funds.reduce((a: number, f: Fund) => a + f.change, 0);
 
       setTimeout(() => this.initializeCharts(), 50);
     });
@@ -72,6 +73,14 @@ export class DashboardComponent implements OnInit, AfterViewInit {
               pointRadius: 0,
               fill: false,
               tension: 0.3,
+            },
+            {
+              data: Array(fund.history.length).fill(fund.open),
+              borderColor: '#808080',
+              borderWidth: 1,
+              pointRadius: 0,
+              fill: false,
+              borderDash: [5, 5],
             }]
           },
           options: {

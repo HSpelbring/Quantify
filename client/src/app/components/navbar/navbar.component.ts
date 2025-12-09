@@ -21,25 +21,25 @@ export class NavbarComponent implements AfterViewInit {
     { name: 'Settings', route: '/settings', icon: 'settings.png' }
   ];
 
-  constructor(private el: ElementRef) {}
+  constructor(private el: ElementRef) { }
 
   ngAfterViewInit() {
     const iconDivs = this.el.nativeElement.querySelectorAll('[data-icon]');
     iconDivs.forEach((div: HTMLElement) => {
-        const iconName = div.dataset['icon'] as keyof typeof icons;
-        const iconEntry = icons[iconName];
+      const iconName = div.dataset['icon'] as keyof typeof icons;
+      const iconEntry = icons[iconName];
 
-        // Some Lucide icons may not exist or be improperly typed, so we check and cast
-        if (iconEntry && typeof (iconEntry as any).toSvg === 'function') {
+      // Some Lucide icons may not exist or be improperly typed, so we check and cast
+      if (iconEntry && typeof (iconEntry as any).toSvg === 'function') {
         div.innerHTML = (iconEntry as any).toSvg({
-            width: 22,
-            height: 22,
-            stroke: '#dcdcdc',
-            'stroke-width': 1.8,
+          width: 22,
+          height: 22,
+          stroke: '#dcdcdc',
+          'stroke-width': 1.8,
         });
-        } else {
+      } else {
         console.warn(`⚠️ Lucide icon "${iconName}" not found.`);
-        }
+      }
     });
   }
 

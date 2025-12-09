@@ -96,5 +96,17 @@ func RegisterRoutes(router *gin.Engine) {
 			defer resp.Body.Close()
 			c.DataFromReader(http.StatusOK, resp.ContentLength, "application/json", resp.Body, nil)
 		})
+		//  Stock details (Python service)
+		r.GET("/stock/:symbol", func(c *gin.Context) {
+			symbol := c.Param("symbol")
+			resp, err := http.Get("http://localhost:8000/stock/" + symbol)
+			if err != nil {
+				log.Println("Error contacting Python service:", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			defer resp.Body.Close()
+			c.DataFromReader(http.StatusOK, resp.ContentLength, "application/json", resp.Body, nil)
+		})
 	}
 }

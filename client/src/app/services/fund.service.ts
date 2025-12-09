@@ -10,7 +10,7 @@ export class FundService {
   private cacheTime = 60 * 1000; // 1 minute
   private lastFetch = 0;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
   getFunds(): Observable<any> {
     const now = Date.now();
@@ -33,5 +33,23 @@ export class FundService {
     );
 
     return this.fundsCache$;
+  }
+
+  getStockDetails(symbol: string): Observable<any> {
+    return this.http.get(`/api/stock/${symbol}`).pipe(
+      catchError(err => {
+        console.error('Stock details fetch error:', err);
+        return of({ error: 'Failed to fetch stock details' });
+      })
+    );
+  }
+
+  getStockHistory(symbol: string, range: string = '1M'): Observable<any> {
+    return this.http.get(`/api/history/${symbol}?range=${range}`).pipe(
+      catchError(err => {
+        console.error('Stock history fetch error:', err);
+        return of({ error: 'Failed to fetch stock history' });
+      })
+    );
   }
 }
