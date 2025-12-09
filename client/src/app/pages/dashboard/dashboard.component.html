@@ -27,7 +27,9 @@
             </div>
             <canvas class="fund-chart" [id]="'fundChart' + repeat + '_' + i" width="70" height="30"></canvas>
             <div class="fund-right">
-              <div class="fund-price">{{ fund.price | currency:'USD' }}</div>
+              <div class="fund-price" [class.up]="fund.change > 0" [class.down]="fund.change < 0">
+                {{ fund.price | currency:'USD' }}
+              </div>
               <div class="fund-change" [class.up]="fund.change > 0" [class.down]="fund.change < 0">
                 {{ fund.change > 0 ? '▲' : '▼' }} {{ fund.change }}%
               </div>

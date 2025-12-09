@@ -23,8 +23,10 @@
         </button>
       </div>
 
-      <canvas #stockChart id="stockChart"></canvas>
-
+      <canvas #stockChart id="stockChart" *ngIf="details.symbol !== '-'"></canvas>
+      <div *ngIf="details.symbol === '-'" class="empty-chart-placeholder">
+        <!-- Optional: Placeholder content or keep it completely empty -->
+      </div>
     </div>
   </div>
 
@@ -41,8 +43,8 @@
           <div class="detail-item">
             <div class="detail-label">Symbol</div>
             <div class="detail-value" style="display: flex; align-items: center; gap: 10px;">
-              {{ details.symbol || 'AAPL' }}
-              <button *ngIf="details.symbol" class="watchlist-btn" (click)="toggleWatchlist()"
+              {{ details.symbol }}
+              <button *ngIf="details.symbol !== '-'" class="watchlist-btn" (click)="toggleWatchlist()"
                 [class.in-watchlist]="isInWatchlist()">
                 {{ isInWatchlist() ? '★' : '☆' }}
               </button>
@@ -65,37 +67,37 @@
 
           <div class="detail-item">
             <div class="detail-label">Day Range</div>
-            <div class="detail-value">{{ details.dayRange || '210.44 – 213.02' }}</div>
+            <div class="detail-value">{{ details.dayRange }}</div>
           </div>
 
           <div class="detail-item">
             <div class="detail-label">52W Range</div>
-            <div class="detail-value">{{ details.yearRange || '164 – 223' }}</div>
+            <div class="detail-value">{{ details.yearRange }}</div>
           </div>
 
           <div class="detail-item">
             <div class="detail-label">Market Cap</div>
-            <div class="detail-value">{{ details.marketCap || '3.2T' }}</div>
+            <div class="detail-value">{{ details.marketCap }}</div>
           </div>
 
           <div class="detail-item">
             <div class="detail-label">Volume</div>
-            <div class="detail-value">{{ details.volume || '78.1M' }}</div>
+            <div class="detail-value">{{ details.volume }}</div>
           </div>
 
           <div class="detail-item">
             <div class="detail-label">Avg Volume</div>
-            <div class="detail-value">{{ details.avgVolume || '91.2M' }}</div>
+            <div class="detail-value">{{ details.avgVolume }}</div>
           </div>
 
           <div class="detail-item">
             <div class="detail-label">PE Ratio</div>
-            <div class="detail-value">{{ details.pe || '32.4' }}</div>
+            <div class="detail-value">{{ details.pe }}</div>
           </div>
 
           <div class="detail-item">
             <div class="detail-label">EPS</div>
-            <div class="detail-value">{{ details.eps || '4.98' }}</div>
+            <div class="detail-value">{{ details.eps }}</div>
           </div>
 
         </div>
@@ -109,12 +111,25 @@
         <div class="summary-item"><strong>Industry:</strong> {{ companyInfo.industry }}</div>
         <div class="summary-item"><strong>Employees:</strong> {{ companyInfo.employees > 0 ?
           companyInfo.employees.toLocaleString() : 'N/A' }}</div>
-        <div class="summary-item"><strong>Location:</strong> {{ companyInfo.city }}, {{ companyInfo.country }}</div>
+        <div class="summary-item"><strong>Location:</strong>
+          <span *ngIf="companyInfo.city !== '-' || companyInfo.country !== '-'">
+            {{ companyInfo.city !== '-' ? companyInfo.city : '' }}<span
+              *ngIf="companyInfo.city !== '-' && companyInfo.country !== '-'">, </span>{{ companyInfo.country !== '-' ?
+            companyInfo.country : '' }}
+          </span>
+          <span *ngIf="companyInfo.city === '-' && companyInfo.country === '-'">-</span>
+        </div>
         <div class="summary-item" *ngIf="companyInfo.website"><strong>Website:</strong> <a [href]="companyInfo.website"
             target="_blank" class="website-link">{{ companyInfo.website }}</a></div>
         <div class="summary-description">
           <strong>Description:</strong>
-          <p>{{ companyInfo.description }}</p>
+          <p [class.description-clamped]="!isDescriptionExpanded">
+            {{ companyInfo.description }}
+          </p>
+          <button class="read-more-btn" (click)="toggleDescription()"
+            *ngIf="companyInfo.description && companyInfo.description !== '-'">
+            {{ isDescriptionExpanded ? 'Read less' : 'Read more...' }}
+          </button>
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import { Component, inject, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
+import { Component, inject, AfterViewInit, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
 import { NgFor, NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { FundService } from '../../services/fund.service';
@@ -19,6 +19,7 @@ export class LookupComponent implements AfterViewInit {
   @ViewChild('stockChart') chartCanvas!: ElementRef<HTMLCanvasElement>;
 
   fundService = inject(FundService);
+  cdr = inject(ChangeDetectorRef);
   chart: Chart | null = null;
 
   query = '';
@@ -29,33 +30,35 @@ export class LookupComponent implements AfterViewInit {
   error = '';
 
   details: any = {
-    symbol: '',
-    name: '',
+    symbol: '-',
+    name: '-',
     price: 0,
     change: 0,
     changePercent: 0,
-    dayRange: '',
-    yearRange: '',
-    marketCap: '',
-    volume: '',
-    avgVolume: '',
-    pe: '',
-    eps: '',
-    high: '',
-    low: '',
-    open: '',
-    prevClose: ''
+    dayRange: '-',
+    yearRange: '-',
+    marketCap: '-',
+    volume: '-',
+    avgVolume: '-',
+    pe: '-',
+    eps: '-',
+    high: '-',
+    low: '-',
+    open: '-',
+    prevClose: '-'
   };
 
   companyInfo: any = {
-    sector: '',
-    industry: '',
+    sector: '-',
+    industry: '-',
     employees: 0,
-    description: '',
+    description: '-',
     website: '',
-    country: '',
-    city: ''
+    country: '-',
+    city: '-'
   };
+
+  isDescriptionExpanded = false;
 
   watchlist = [
     { symbol: 'AAPL', price: 212.54 },
@@ -133,6 +136,15 @@ export class LookupComponent implements AfterViewInit {
 
         this.loading = false;
 
+        // Force view update so *ngIf renders the canvas
+        this.cdr.detectChanges();
+
+        // Destroy previous chart to ensure clean state for new symbol
+        this.destroyChart();
+
+        // Initialize chart if it doesn't exist (it shouldn't after destroy)
+        this.initializeChart();
+
         // Also fetch history for the current timeframe
         this.loadHistory(symbol, this.activeTF);
       },
@@ -142,6 +154,13 @@ export class LookupComponent implements AfterViewInit {
         this.loading = false;
       }
     });
+  }
+
+  changeTimeframe(tf: string) {
+    this.activeTF = tf;
+    if (this.details.symbol && this.details.symbol !== '-') {
+      this.loadHistory(this.details.symbol, tf);
+    }
   }
 
   loadHistory(symbol: string, timeframe: string) {
@@ -213,30 +232,30 @@ export class LookupComponent implements AfterViewInit {
     }
   }
 
-  changeTimeframe(tf: string) {
-    this.activeTF = tf;
-    if (this.details.symbol) {
-      this.loadHistory(this.details.symbol, tf);
-    }
-  }
+
 
   ngAfterViewInit() {
     this.initializeChart();
   }
 
-  initializeChart() {
+  initializeChart(labels: string[] = [], data: number[] = []) {
     if (!this.chartCanvas) return;
 
     const ctx = this.chartCanvas.nativeElement.getContext('2d');
     if (!ctx) return;
 
+    // Destroy existing chart if any
+    if (this.chart) {
+      this.chart.destroy();
+    }
+
     this.chart = new Chart(ctx, {
       type: 'line',
       data: {
-        labels: [],
+        labels: labels,
         datasets: [{
           label: 'Price',
-          data: [],
+          data: data,
           borderColor: '#4caf50',
           backgroundColor: 'rgba(76, 175, 80, 0.1)',
           borderWidth: 2,
@@ -296,14 +315,31 @@ export class LookupComponent implements AfterViewInit {
     });
   }
 
+  destroyChart() {
+    if (this.chart) {
+      this.chart.destroy();
+      this.chart = null;
+    }
+  }
+
   updateChart(historyData: any[]) {
-    if (!this.chart || !historyData || historyData.length === 0) return;
+    if (!historyData || historyData.length === 0) return;
 
     const labels = historyData.map(d => d.date);
     const prices = historyData.map(d => d.close);
 
-    this.chart.data.labels = labels;
-    this.chart.data.datasets[0].data = prices;
-    this.chart.update();
+    // If chart exists, just update data
+    if (this.chart) {
+      this.chart.data.labels = labels;
+      this.chart.data.datasets[0].data = prices;
+      this.chart.update();
+    } else {
+      // If chart doesn't exist (e.g. first load), initialize it with data
+      this.initializeChart(labels, prices);
+    }
+  }
+
+  toggleDescription() {
+    this.isDescriptionExpanded = !this.isDescriptionExpanded;
   }
 }

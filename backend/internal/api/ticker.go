@@ -32,6 +32,7 @@ var fundSymbols = []struct {
 type QuoteResponse struct {
 	Price   float64   `json:"price"`
 	Change  float64   `json:"change"`
+	Open    float64   `json:"open"`
 	History []float64 `json:"history"`
 }
 
@@ -76,6 +77,7 @@ func HandleFunds(w http.ResponseWriter, r *http.Request) {
 			Name:    s.Name,
 			Price:   q.Price,
 			Change:  q.Change,
+			Open:    q.Open,
 			History: q.History,
 		})
 	}

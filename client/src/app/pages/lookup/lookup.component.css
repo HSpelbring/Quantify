@@ -307,3 +307,26 @@
 .watch-item:hover {
   background: #222;
 }
+
+.description-clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.read-more-btn {
+  background: none;
+  border: none;
+  color: #4caf50;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 5px;
+  font-size: 0.9em;
+  font-weight: 500;
+}
+
+.read-more-btn:hover {
+  text-decoration: underline;
+}

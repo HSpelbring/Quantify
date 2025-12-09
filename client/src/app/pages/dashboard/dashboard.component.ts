@@ -30,7 +30,6 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.fundService.getFunds().subscribe((data: any) => {
       this.funds = data;
 
-      // Example portfolio logic
       this.portfolio.price = this.funds.reduce((a: number, f: Fund) => a + f.price, 0);
       this.portfolio.change = this.funds.reduce((a: number, f: Fund) => a + f.change, 0);
 
@@ -76,11 +75,11 @@ export class DashboardComponent implements OnInit, AfterViewInit {
             },
             {
               data: Array(fund.history.length).fill(fund.open),
-              borderColor: '#808080',
+              borderColor: '#888888',
               borderWidth: 1,
               pointRadius: 0,
               fill: false,
-              borderDash: [5, 5],
+              borderDash: [2, 2],
             }]
           },
           options: {
