@@ -11,6 +11,7 @@ import (
 type QuoteResponse struct {
 	Price   float64   `json:"price"`
 	Change  float64   `json:"change"`
+	Open    float64   `json:"open"`
 	History []float64 `json:"history"`
 }
 
@@ -30,6 +31,7 @@ func FetchYahoo(symbol string) (models.Fund, error) {
 		lookup = mapped
 	}
 
+	// log.Printf("[FetchYahoo] Fetching quotes from Python...")
 	resp, err := http.Get("http://localhost:8000/quotes")
 	if err != nil {
 		return f, err
@@ -45,10 +47,14 @@ func FetchYahoo(symbol string) (models.Fund, error) {
 
 	// Match the index or ETF symbol
 	if q, ok := quotes[lookup]; ok {
+		// log.Printf("[FetchYahoo] Found %s (price=%.2f, history=%d points)", lookup, q.Price, len(q.History))
 		f.Symbol = symbol
 		f.Price = q.Price
 		f.Change = q.Change
+		f.Open = q.Open
 		f.History = q.History
+	} else {
+		// log.Printf("[FetchYahoo] Symbol %s not found in quotes response", lookup)
 	}
 
 	return f, nil

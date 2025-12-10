@@ -67,12 +67,16 @@ func RegisterRoutes(router *gin.Engine) {
 		r.GET("/history/:symbol", func(c *gin.Context) {
 			symbol := c.Param("symbol")
 			rangeParam := c.Query("range")
-			data, err := fetch.FetchHistory(symbol, rangeParam)
+
+			// Proxy to Python service
+			resp, err := http.Get("http://localhost:8000/history/" + symbol + "?range=" + rangeParam)
 			if err != nil {
+				log.Println("Error contacting Python service:", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
-			c.JSON(http.StatusOK, data)
+			defer resp.Body.Close()
+			c.DataFromReader(http.StatusOK, resp.ContentLength, "application/json", resp.Body, nil)
 		})
 
 		//  EOD snapshot
@@ -86,8 +90,8 @@ func RegisterRoutes(router *gin.Engine) {
 		})
 
 		//  Insights (Python service)
-		r.GET("/insight", func(c *gin.Context) {
-			resp, err := http.Get("http://localhost:8000/analyze")
+		r.GET("/insights", func(c *gin.Context) {
+			resp, err := http.Get("http://localhost:8000/insights")
 			if err != nil {
 				log.Println("Error contacting Python service:", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -107,6 +111,17 @@ func RegisterRoutes(router *gin.Engine) {
 			}
 			defer resp.Body.Close()
 			c.DataFromReader(http.StatusOK, resp.ContentLength, "application/json", resp.Body, nil)
+		})
+
+		//  Search Autocomplete
+		r.GET("/search", func(c *gin.Context) {
+			query := c.Query("q")
+			results, err := fetch.SearchSymbols(query)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, results)
 		})
 	}
 }

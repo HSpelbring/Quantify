@@ -4,7 +4,6 @@ import (
 	"backend/internal/models"
 	"errors"
 	"math"
-	"strings"
 )
 
 func FetchFund(symbol string) (models.Fund, error) {
@@ -44,10 +43,11 @@ func FetchFund(symbol string) (models.Fund, error) {
 
 	needsFallback := price == 0 || math.IsNaN(price)
 
-	// If it's an index (^GSPC, ^NDX, etc.) ALWAYS use Finnhub
-	if strings.HasPrefix(symbol, "^") {
-		needsFallback = true
-	}
+	// If it's an index (^GSPC, ^NDX, etc.) we used to force Finnhub,
+	// but now we trust Yahoo/Python unless it failed.
+	// if strings.HasPrefix(symbol, "^") {
+	// 	needsFallback = true
+	// }
 
 	if needsFallback {
 		p, ch, ferr := FetchFinnhubQuote(symbol)

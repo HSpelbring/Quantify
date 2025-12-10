@@ -1,0 +1,43 @@
+<div class="dashboard-container">
+    <div class="header-section">
+        <h1>Market Sentiment</h1>
+    </div>
+
+    <div class="gauge-section">
+        <app-sentiment-gauge [score]="65"></app-sentiment-gauge>
+    </div>
+
+    <div class="heatmap-section">
+        <h2>Sector Performance</h2>
+        <app-sector-heatmap></app-sector-heatmap>
+    </div>
+
+    <div class="movers-section">
+        <div class="movers-column">
+            <h3>Bullish Movers</h3>
+            <div class="mover-card">
+                <span class="ticker">NVDA</span>
+                <span class="change positive">+4.5%</span>
+                <span class="reason">Strong AI demand, analyst upgrade.</span>
+            </div>
+            <div class="mover-card">
+                <span class="ticker">TSLA</span>
+                <span class="change positive">+2.1%</span>
+                <span class="reason">New model delivery numbers exceed estimates.</span>
+            </div>
+        </div>
+        <div class="movers-column">
+            <h3>Bearish Movers</h3>
+            <div class="mover-card">
+                <span class="ticker">AAPL</span>
+                <span class="change negative">-1.2%</span>
+                <span class="reason">Supply chain delays affecting iPhone production.</span>
+            </div>
+            <div class="mover-card">
+                <span class="ticker">XOM</span>
+                <span class="change negative">-0.8%</span>
+                <span class="reason">Oil prices dip on inventory data.</span>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,8 @@
+<div class="heatmap-container">
+    <div *ngFor="let sector of sectors" class="sector-box" [style.background-color]="getColor(sector.score)">
+        <div class="sector-name">{{ sector.name }}</div>
+        <div class="sector-change" [class.positive]="sector.change > 0" [class.negative]="sector.change < 0">
+            {{ sector.change > 0 ? '+' : '' }}{{ sector.change }}%
+        </div>
+    </div>
+</div>

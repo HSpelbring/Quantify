@@ -2,7 +2,8 @@
 .portfolio-wrapper {
   height: 100vh;
   overflow-y: auto;
-  padding-left: var(--navbar-width, 70px); /* dynamically adjusts with hover */
+  padding-left: var(--navbar-width, 70px);
+  /* dynamically adjusts with hover */
   padding-top: 20px;
   padding-right: 20px;
   padding-bottom: 20px;
@@ -156,6 +157,7 @@
   text-align: right;
 }
 
+
 .graph-tf-controls {
   position: absolute;
   top: 10px;
@@ -163,4 +165,130 @@
   display: flex;
   gap: 8px;
   z-index: 10;
+}
+
+/* MODAL STYLES */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: #222;
+  border: 1px solid #444;
+  padding: 30px;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.modal-content h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  text-align: center;
+  font-size: 24px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #ccc;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 10px;
+  background: #333;
+  border: 1px solid #555;
+  border-radius: 6px;
+  color: white;
+  font-size: 16px;
+  box-sizing: border-box;
+  /* Ensure padding doesn't affect width */
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #4caf50;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 30px;
+  gap: 15px;
+}
+
+.btn-cancel {
+  flex: 1;
+  padding: 10px;
+  background: transparent;
+  border: 1px solid #555;
+  border-radius: 6px;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.btn-cancel:hover {
+  background: #333;
+}
+
+.btn-confirm {
+  flex: 1;
+  padding: 10px;
+  background: #4caf50;
+  border: none;
+  border-radius: 6px;
+  color: black;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.btn-confirm:hover {
+  opacity: 0.9;
+}
+
+/* UNINVESTED CASH SECTION */
+.cash-section {
+  margin-top: 30px;
+  border-top: 1px solid #333;
+  padding-top: 20px;
+}
+
+.cash-card {
+  background: #1f1f1f;
+  border: 1px solid #333;
+  padding: 20px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cash-label {
+  font-size: 18px;
+  color: #ccc;
+}
+
+.cash-value {
+  font-size: 28px;
+  font-weight: bold;
+  color: #4caf50;
 }

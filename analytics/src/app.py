@@ -84,10 +84,49 @@ def finnhub_quote(symbol: str):
         print(f"Finnhub error for {symbol}: {e}")
         return None
 
-@app.get("/analyze")
-def analyze():
+def get_analyst_ratings(ticker, info):
+    """
+    Helper to extract analyst ratings from yfinance ticker.
+    Returns dict with consensus and counts.
+    """
+    try:
+        # Default empty structure
+        recs = {
+            "consensus": info.get("recommendationKey", "none").replace("_", " ").title(),
+            "strongBuy": 0,
+            "buy": 0,
+            "hold": 0,
+            "sell": 0,
+            "strongSell": 0
+        }
+        
+        # Try fetching the summary
+        summary = ticker.recommendations_summary
+        if summary is not None and not summary.empty:
+            # Usually the first row (index 0) is the latest "0m" (current month)
+            # or it might be aggregated. We take the row with highest total opinions or just first one.
+            # `recommendations_summary` columns: period, strongBuy, buy, hold, sell, strongSell
+            
+            latest = summary.iloc[0]
+            recs["strongBuy"] = int(latest.get("strongBuy", 0))
+            recs["buy"] = int(latest.get("buy", 0))
+            recs["hold"] = int(latest.get("hold", 0))
+            recs["sell"] = int(latest.get("sell", 0))
+            recs["strongSell"] = int(latest.get("strongSell", 0))
+            
+        return recs
+
+    except Exception as e:
+        print(f"Error fetching analyst ratings: {e}")
+        return {
+            "consensus": "N/A",
+            "strongBuy": 0, "buy": 0, "hold": 0, "sell": 0, "strongSell": 0
+        }
+
+@app.get("/insights")
+def get_insights():
     data = generate_insight()
-    return {"insight": data}
+    return data
 
 
 @app.get("/price/{symbol}")
@@ -208,7 +247,9 @@ def get_stock_details(symbol: str):
             "description": info.get("longBusinessSummary", "No description available"),
             "website": info.get("website", ""),
             "country": info.get("country", "N/A"),
-            "city": info.get("city", "N/A")
+            "city": info.get("city", "N/A"),
+            # Analyst Recommendations
+            "recommendations": get_analyst_ratings(ticker, info)
         }
     except Exception as e:
         print(f"Error fetching stock details for {symbol}: {e}")

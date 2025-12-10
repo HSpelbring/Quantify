@@ -1,8 +1,10 @@
-import { Component, inject, AfterViewInit, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
 import { NgFor, NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { FundService } from '../../services/fund.service';
 import { Chart, registerables } from 'chart.js';
+import { Subject, Subscription, timer } from 'rxjs';
+import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 
 // Register Chart.js components
 Chart.register(...registerables);
@@ -14,7 +16,7 @@ Chart.register(...registerables);
   templateUrl: './lookup.component.html',
   styleUrls: ['./lookup.component.css']
 })
-export class LookupComponent implements AfterViewInit {
+export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
 
   @ViewChild('stockChart') chartCanvas!: ElementRef<HTMLCanvasElement>;
 
@@ -26,8 +28,14 @@ export class LookupComponent implements AfterViewInit {
   previous: string[] = [];
   timeframes = ['1D', '5D', '1M', '3M', '6M', '1Y', '5Y', 'MAX'];
   activeTF = '1D';
+  periodChange = 0;
+  periodChangePercent = 0;
   loading = false;
   error = '';
+
+  searchResults: any[] = [];
+  private searchSubject = new Subject<string>();
+  private searchSubscription!: Subscription;
 
   details: any = {
     symbol: '-',
@@ -55,7 +63,15 @@ export class LookupComponent implements AfterViewInit {
     description: '-',
     website: '',
     country: '-',
-    city: '-'
+    city: '-',
+    recommendations: {
+      consensus: 'N/A',
+      strongBuy: 0,
+      buy: 0,
+      hold: 0,
+      sell: 0,
+      strongSell: 0
+    }
   };
 
   isDescriptionExpanded = false;
@@ -131,7 +147,15 @@ export class LookupComponent implements AfterViewInit {
           description: data.description || 'No description available',
           website: data.website || '',
           country: data.country || 'N/A',
-          city: data.city || 'N/A'
+          city: data.city || 'N/A',
+          recommendations: data.recommendations || {
+            consensus: 'N/A',
+            strongBuy: 0,
+            buy: 0,
+            hold: 0,
+            sell: 0,
+            strongSell: 0
+          }
         };
 
         this.loading = false;
@@ -173,6 +197,19 @@ export class LookupComponent implements AfterViewInit {
         // Update chart with historical data
         if (data.data && data.data.length > 0) {
           this.updateChart(data.data);
+
+          // Calculate Period Change
+          const prices = data.data.map((d: any) => d.close);
+          if (prices.length > 0) {
+            const startPrice = prices[0];
+            const endPrice = prices[prices.length - 1];
+
+            this.periodChange = endPrice - startPrice;
+            this.periodChangePercent = ((endPrice - startPrice) / startPrice) * 100;
+          } else {
+            this.periodChange = 0;
+            this.periodChangePercent = 0;
+          }
         }
       },
       error: (err) => {
@@ -341,5 +378,41 @@ export class LookupComponent implements AfterViewInit {
 
   toggleDescription() {
     this.isDescriptionExpanded = !this.isDescriptionExpanded;
+  }
+
+  ngOnInit() {
+    this.searchSubscription = this.searchSubject.pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(query => {
+        if (!query.trim()) return timer(0).pipe(switchMap(() => []));
+        return this.fundService.searchStocks(query);
+      })
+    ).subscribe(results => {
+      this.searchResults = results;
+    });
+  }
+
+  ngOnDestroy() {
+    if (this.searchSubscription) {
+      this.searchSubscription.unsubscribe();
+    }
+  }
+
+  onInput() {
+    this.searchSubject.next(this.query);
+  }
+
+  selectResult(result: any) {
+    this.query = result.symbol;
+    this.searchResults = [];
+    this.onSearch();
+  }
+
+  closeSearch() {
+    // Small delay to allow click event to register on dropdown items
+    setTimeout(() => {
+      this.searchResults = [];
+    }, 200);
   }
 }

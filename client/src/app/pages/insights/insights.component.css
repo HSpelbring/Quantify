@@ -1,0 +1,197 @@
+.insights-container {
+    padding: 20px;
+    color: #e0e0e0;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.page-title {
+    font-size: 24px;
+    margin-bottom: 20px;
+    font-weight: 300;
+    letter-spacing: 1px;
+}
+
+.loading,
+.error {
+    text-align: center;
+    margin-top: 50px;
+    color: #888;
+}
+
+.error {
+    color: #ff4444;
+}
+
+.dashboard-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.card {
+    background: #1e1e1e;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #333;
+}
+
+h2 {
+    font-size: 16px;
+    color: #888;
+    margin-bottom: 15px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* SENTIMENT SECTION */
+.sentiment-section {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 20px;
+}
+
+.gauge-container {
+    text-align: center;
+    padding: 20px 0;
+}
+
+.gauge-score {
+    font-size: 48px;
+    font-weight: bold;
+}
+
+.gauge-label {
+    font-size: 18px;
+    color: #ccc;
+    margin-bottom: 10px;
+}
+
+.gauge-bar {
+    width: 100%;
+    height: 8px;
+    background: #333;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 10px;
+}
+
+.gauge-fill {
+    height: 100%;
+    transition: width 0.5s ease;
+}
+
+.ai-summary p {
+    font-size: 16px;
+    line-height: 1.6;
+    color: #ccc;
+}
+
+/* NEWS FEED */
+.news-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.news-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #333;
+}
+
+.news-item:last-child {
+    border-bottom: none;
+}
+
+.news-title {
+    font-size: 15px;
+    font-weight: 500;
+    color: #fff;
+    margin-bottom: 5px;
+}
+
+.news-meta {
+    font-size: 12px;
+    color: #888;
+}
+
+.sentiment-tag {
+    margin-left: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    text-transform: uppercase;
+}
+
+.sentiment-tag.bullish {
+    background: rgba(0, 200, 81, 0.2);
+    color: #00C851;
+}
+
+.sentiment-tag.bearish {
+    background: rgba(255, 68, 68, 0.2);
+    color: #ff4444;
+}
+
+.news-score {
+    font-size: 14px;
+    font-weight: bold;
+    color: #666;
+}
+
+/* SECTOR PERF */
+.sector-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    /* Responsive columns */
+    gap: 15px;
+}
+
+.sector-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+}
+
+.sector-name {
+    width: 140px;
+    color: #aaa;
+}
+
+.sector-bar-container {
+    flex: 1;
+    height: 6px;
+    background: #2a2a2a;
+    border-radius: 3px;
+    margin: 0 10px;
+    display: flex;
+    /* Allow centering of bar for negative/positive split effect if desired later */
+    justify-content: flex-start;
+    /* Default start */
+}
+
+/* Simple bar for now */
+.sector-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s;
+    max-width: 100%;
+}
+
+.sector-val {
+    width: 50px;
+    text-align: right;
+    font-weight: bold;
+}
+
+.sector-val.pos {
+    color: #00C851;
+}
+
+.sector-val.neg {
+    color: #ff4444;
+}

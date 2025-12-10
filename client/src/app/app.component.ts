@@ -35,20 +35,10 @@ import { HttpClient } from '@angular/common/http';
 
     .content {
       flex: 1;
-      overflow: hidden; /* ✅ prevent scrolling here */
-      padding: 10px;
+      overflow: hidden;
+      padding: 0;
       position: relative;
       z-index: 1;
-    }
-
-    .content-inner {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      overflow-y: auto; /* optional inner scroll if you ever have long content */
-      padding: 40px;
     }
   `]
 })
@@ -58,7 +48,7 @@ export class AppComponent {
   price: number | null = null;
   error = '';
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
   getPrice() {
     this.price = null;

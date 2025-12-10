@@ -1,0 +1,71 @@
+<div class="insights-container">
+    <h1 class="page-title">Market Intelligence</h1>
+
+    <div *ngIf="loading" class="loading">Analyzing market data...</div>
+    <div *ngIf="error" class="error">{{ error }}</div>
+
+    <div *ngIf="!loading && !error" class="dashboard-grid">
+
+        <!-- ROW 1: Sentiment & AI Summary -->
+        <div class="sentiment-section">
+            <div class="card sentiment-card">
+                <h2>Fear & Greed Index</h2>
+                <div class="gauge-container">
+                    <div class="gauge-score" [style.color]="getSentimentColor(sentiment.score)">{{ sentiment.score }}
+                    </div>
+                    <div class="gauge-label">{{ sentiment.label }}</div>
+                    <div class="gauge-bar">
+                        <div class="gauge-fill" [style.width.%]="sentiment.score"
+                            [style.background-color]="getSentimentColor(sentiment.score)"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card ai-card">
+                <h2>AI Market Sentinel</h2>
+                <div class="ai-summary">
+                    <p>{{ sentiment.summary }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ROW 2: News Feed -->
+        <div class="card news-feed">
+            <h2>Top Market News</h2>
+            <div class="news-list">
+                <div class="news-item" *ngFor="let item of news">
+                    <div class="news-content">
+                        <div class="news-title">{{ item.title }}</div>
+                        <div class="news-meta">
+                            <span class="news-source">{{ item.source }}</span> •
+                            <span class="sentiment-tag" [class.bullish]="item.sentiment === 'Bullish'"
+                                [class.bearish]="item.sentiment === 'Bearish'">{{ item.sentiment }}</span>
+                        </div>
+                    </div>
+                    <div class="news-score">{{ item.score }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ROW 3: Sector Performance -->
+        <div class="card sector-perf">
+            <h2>Sector Performance (Daily)</h2>
+            <div class="sector-list">
+                <div class="sector-item" *ngFor="let sec of sectors">
+                    <div class="sector-name">{{ sec.name }}</div>
+                    <div class="sector-bar-container">
+                        <div class="sector-bar" [style.width.%]="sec.change < 0 ? sec.change * -10 : sec.change * 10"
+                            [style.background-color]="sec.change >= 0 ? '#00C851' : '#ff4444'"
+                            [style.margin-left]="sec.change < 0 ? 'auto' : '0'"
+                            [style.margin-right]="sec.change >= 0 ? 'auto' : '0'">
+                        </div>
+                    </div>
+                    <div class="sector-val" [class.pos]="sec.change >= 0" [class.neg]="sec.change < 0">
+                        {{ sec.change > 0 ? '+' : ''}}{{ sec.change }}%
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>

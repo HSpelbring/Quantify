@@ -43,16 +43,5 @@ export class NavbarComponent implements AfterViewInit {
     });
   }
 
-
-  @HostListener('mouseenter')
-  onMouseEnter() {
-    this.expanded = true;
-    document.documentElement.style.setProperty('--navbar-width', '200px');
-  }
-
-  @HostListener('mouseleave')
-  onMouseLeave() {
-    this.expanded = false;
-    document.documentElement.style.setProperty('--navbar-width', '70px');
-  }
+  // Removed manual width manipulation to rely on pure CSS hover states
 }

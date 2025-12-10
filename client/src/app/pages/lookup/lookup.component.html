@@ -2,7 +2,19 @@
 
   <!-- SEARCH BAR -->
   <div class="search-section">
-    <input class="search-input" type="text" placeholder="Search a stock (AAPL, MSFT, BTC-USD...)" [(ngModel)]="query" />
+    <div class="search-container">
+      <input class="search-input" type="text" placeholder="Search a stock (AAPL, MSFT, BTC-USD...)" [(ngModel)]="query"
+        (input)="onInput()" (blur)="closeSearch()" />
+
+      <!-- Autocomplete Dropdown -->
+      <ul class="autocomplete-dropdown" *ngIf="searchResults.length > 0">
+        <li *ngFor="let result of searchResults" (mousedown)="selectResult(result)">
+          <span class="symbol">{{ result.symbol }}</span>
+          <span class="name">{{ result.name }}</span>
+          <span class="exchange">{{ result.exchange }}</span>
+        </li>
+      </ul>
+    </div>
     <button class="search-btn" (click)="onSearch()">Search</button>
   </div>
 
@@ -21,6 +33,14 @@
           (click)="changeTimeframe(tf)">
           {{ tf }}
         </button>
+      </div>
+
+      <div class="period-growth-indicator" *ngIf="details.symbol !== '-' && periodChangePercent !== 0"
+        [class.positive]="periodChange >= 0" [class.negative]="periodChange < 0">
+        <span class="pg-label">{{ activeTF }} Change:</span>
+        <span class="pg-value">
+          {{ periodChange >= 0 ? '+' : '' }}{{ periodChangePercent.toFixed(2) }}%
+        </span>
       </div>
 
       <canvas #stockChart id="stockChart" *ngIf="details.symbol !== '-'"></canvas>
@@ -137,6 +157,34 @@
 
     <!-- RIGHT COLUMN -->
     <div class="side-panels">
+
+      <div class="ratings-panel" *ngIf="companyInfo.recommendations">
+        <h2 class="section-title">Analyst Ratings</h2>
+        <div class="consensus-title">{{ companyInfo.recommendations.consensus }}</div>
+
+        <div class="ratings-bar">
+          <div class="rating-box strong-sell">
+            <div class="rating-count">{{ companyInfo.recommendations.strongSell }}</div>
+            <div class="rating-label">Strong Sell</div>
+          </div>
+          <div class="rating-box sell">
+            <div class="rating-count">{{ companyInfo.recommendations.sell }}</div>
+            <div class="rating-label">Sell</div>
+          </div>
+          <div class="rating-box hold">
+            <div class="rating-count">{{ companyInfo.recommendations.hold }}</div>
+            <div class="rating-label">Hold</div>
+          </div>
+          <div class="rating-box buy">
+            <div class="rating-count">{{ companyInfo.recommendations.buy }}</div>
+            <div class="rating-label">Buy</div>
+          </div>
+          <div class="rating-box strong-buy">
+            <div class="rating-count">{{ companyInfo.recommendations.strongBuy }}</div>
+            <div class="rating-label">Strong Buy</div>
+          </div>
+        </div>
+      </div>
 
       <div class="watchlist-panel">
         <h2 class="section-title">Watchlist</h2>

@@ -52,4 +52,23 @@ export class FundService {
       })
     );
   }
+
+  getMarketInsights(): Observable<any> {
+    return this.http.get('/api/insights').pipe(
+      catchError(err => {
+        console.error('Insights fetch error:', err);
+        return of({ error: 'Failed to fetch insights' });
+      })
+    );
+  }
+
+  searchStocks(query: string): Observable<any[]> {
+    if (!query) return of([]);
+    return this.http.get<any[]>(`/api/search?q=${query}`).pipe(
+      catchError(err => {
+        console.error('Search error:', err);
+        return of([]);
+      })
+    );
+  }
 }
