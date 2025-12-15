@@ -1,63 +1,122 @@
 <div class="portfolio-wrapper">
 
+  <!-- TOAST NOTIFICATION -->
+  <div class="toast-container" *ngIf="showToast">
+    <div class="toast-message">{{ toastMessage }}</div>
+  </div>
+
   <!-- HEADER SUMMARY -->
   <div class="summary-box">
-    <div class="summary-main">
-      <h1 class="value">${{ totalValue | number:'1.0-0' }}</h1>
+    <div class="summary-item">
+      <div class="summary-main">
+        <h1 class="value">${{ totalValue | number:'1.2-2' }}</h1>
+        <div class="change" [class.positive]="dailyChange >= 0" [class.negative]="dailyChange < 0">
+          {{ dailyChange >= 0 ? '+' : '' }}{{ dailyChange | number:'1.2-2' }}
+          ({{ pctChange >= 0 ? '+' : '' }}{{ pctChange | number:'1.2-2' }}%)
+        </div>
+      </div>
+      <p class="subtext">Total Portfolio Value</p>
+    </div>
 
-      <div class="change" [class.positive]="dailyChange >= 0" [class.negative]="dailyChange < 0">
-        {{ dailyChange >= 0 ? '+' : '' }}{{ dailyChange | number:'1.2-2' }}
-        ({{ pctChange >= 0 ? '+' : '' }}{{ pctChange | number:'1.2-2' }}%)
+    <div class="summary-divider"></div>
+
+    <div class="summary-item">
+      <div class="summary-main">
+        <h1 class="value value-cash">${{ uninvestedCash | number:'1.2-2' }}</h1>
+      </div>
+      <p class="subtext">Buying Power</p>
+    </div>
+  </div>
+
+  <!-- CHART CONTAINER -->
+  <div class="chart-flex-row">
+    <div class="chart-container glass-card">
+      <div class="graph-tf-controls">
+        <button *ngFor="let tf of timeframes" class="tf-btn" [class.active]="tf === activeTF" (click)="changeTF(tf)">
+          {{ tf }}
+        </button>
+      </div>
+      <canvas id="portfolioChart"></canvas>
+    </div>
+
+    <!-- SECTOR ALLOCATION -->
+    <div class="sector-container glass-card">
+      <h3>Sector Allocation</h3>
+      <div class="sector-chart-wrapper">
+        <canvas id="sectorChart"></canvas>
       </div>
     </div>
-
-    <p class="subtext">Total Portfolio Value</p>
   </div>
 
-  <!-- LARGE GRAPH WITH TIMEFRAME BUTTONS INSIDE -->
-  <div class="chart-container">
-
-    <div class="graph-tf-controls">
-      <button *ngFor="let tf of timeframes" class="tf-btn" [class.active]="tf === activeTF" (click)="changeTF(tf)">
-        {{ tf }}
-      </button>
-    </div>
-
-    <canvas id="portfolioChart"></canvas>
-  </div>
-
-
-  <!-- BUY / SELL BUTTONS -->
+  <!-- ACTION ROW -->
   <div class="action-row">
     <button class="action buy" (click)="buyStock()">Buy</button>
     <button class="action sell" (click)="sellStock()">Sell</button>
   </div>
 
-  <!-- HOLDINGS LIST -->
+  <!-- HOLDINGS TABLE -->
   <div class="holdings-section">
     <h2 class="section-title">Your Holdings</h2>
 
-    <div class="holding-card" *ngFor="let h of holdings">
-      <div class="left">
-        <div class="symbol">{{ h.symbol }}</div>
-        <div class="shares">{{ h.shares }} shares @ ${{ h.avgCost | number:'1.2-2' }}</div>
-      </div>
-
-      <div class="right">
-        <div class="price">${{ h.price | number:'1.2-2' }}</div>
-        <div class="change" [class.positive]="h.change >= 0" [class.negative]="h.change < 0">
-          {{ h.change >= 0 ? '+' : ''}}{{ h.change | number:'1.2-2' }}
-        </div>
-      </div>
+    <div class="holdings-table-container">
+      <table class="holdings-table">
+        <thead>
+          <tr>
+            <th (click)="toggleSort('symbol')">Symbol <span *ngIf="sortColumn === 'symbol'">{{ sortDirection === 'asc' ?
+                '▲' : '▼' }}</span></th>
+            <th (click)="toggleSort('shares')">Shares <span *ngIf="sortColumn === 'shares'">{{ sortDirection === 'asc' ?
+                '▲' : '▼' }}</span></th>
+            <th (click)="toggleSort('price')">Price <span *ngIf="sortColumn === 'price'">{{ sortDirection === 'asc' ?
+                '▲' : '▼' }}</span></th>
+            <th (click)="toggleSort('avgCost')">Avg Cost <span *ngIf="sortColumn === 'avgCost'">{{ sortDirection ===
+                'asc' ? '▲' : '▼' }}</span></th>
+            <th (click)="toggleSort('change')">Change <span *ngIf="sortColumn === 'change'">{{ sortDirection === 'asc' ?
+                '▲' : '▼' }}</span></th>
+            <th (click)="toggleSort('total')">Total Value <span *ngIf="sortColumn === 'total'">{{ sortDirection ===
+                'asc' ? '▲' : '▼' }}</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let h of holdings">
+            <td class="symbol-cell">{{ h.symbol }}</td>
+            <td>{{ h.shares }}</td>
+            <td>${{ h.price | number:'1.2-2' }}</td>
+            <td>${{ h.avgCost | number:'1.2-2' }}</td>
+            <td [class.positive]="h.change >= 0" [class.negative]="h.change < 0">
+              {{ h.change >= 0 ? '+' : ''}}{{ h.change | number:'1.2-2' }}%
+            </td>
+            <td>${{ (h.shares * h.price) | number:'1.2-2' }}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
-  <!-- UNINVESTED CASH SECTION -->
-  <div class="cash-section">
-    <h2 class="section-title">Uninvested Cash</h2>
-    <div class="cash-card">
-      <div class="cash-label">Available to Trade</div>
-      <div class="cash-value">${{ uninvestedCash | number:'1.2-2' }}</div>
+  <!-- TRANSACTION HISTORY -->
+  <div class="holdings-section mt-5" *ngIf="transactions.length > 0">
+    <h2 class="section-title">Transaction History</h2>
+    <div class="holdings-table-container">
+      <table class="holdings-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Symbol</th>
+            <th>Shares</th>
+            <th>Price</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let t of transactions">
+            <td [class.positive]="t.type === 'BUY'" [class.negative]="t.type === 'SELL'" style="font-weight: 600;">{{
+              t.type }}</td>
+            <td class="symbol-cell">{{ t.symbol }}</td>
+            <td>{{ t.shares }}</td>
+            <td>${{ t.price | number:'1.2-2' }}</td>
+            <td style="color: #999;">{{ t.date | date:'short' }}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
@@ -79,6 +138,10 @@
       <label>Purchase Price</label>
       <input type="number" [(ngModel)]="buyData.price" placeholder="0.00" />
     </div>
+
+    <!-- Inline Error -->
+    <div class="error-msg" *ngIf="buyError">{{ buyError }}</div>
+
     <div class="modal-actions">
       <button class="btn-cancel" (click)="closeModals()">Cancel</button>
       <button class="btn-confirm" (click)="confirmBuy()">Confirm Buy</button>
@@ -98,8 +161,15 @@
     </div>
     <div class="form-group">
       <label>Quantity</label>
-      <input type="number" [(ngModel)]="sellData.shares" placeholder="0" />
+      <div class="input-with-action">
+        <input type="number" [(ngModel)]="sellData.shares" placeholder="0" />
+        <button class="btn-max" (click)="setMaxSell()">Max</button>
+      </div>
     </div>
+
+    <!-- Inline Error -->
+    <div class="error-msg" *ngIf="sellError">{{ sellError }}</div>
+
     <div class="modal-actions">
       <button class="btn-cancel" (click)="closeModals()">Cancel</button>
       <button class="btn-confirm" (click)="confirmSell()">Confirm Sell</button>

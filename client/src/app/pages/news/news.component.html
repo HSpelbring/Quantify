@@ -1,0 +1,64 @@
+<div class="news-page">
+
+    <!-- SIDEBAR FILTERS -->
+    <aside class="filters-sidebar">
+        <h2>Scanner Filters</h2>
+
+        <div class="filter-group" *ngFor="let group of filterGroups">
+            <h3>{{ group.name }}</h3>
+            <div class="filter-options">
+                <label class="filter-check" *ngFor="let cat of group.categories">
+                    <input type="checkbox" [checked]="isCategorySelected(cat)" (change)="toggleCategoryFilter(cat)">
+                    <span class="checkmark" [class.active]="isCategorySelected(cat)" [attr.data-cat]="cat"></span>
+                    {{ cat }}
+                </label>
+            </div>
+        </div>
+
+        <div class="stats">
+            <p>Showing <strong>{{ filteredArticles.length }}</strong> of {{ articles.length }} articles</p>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="news-feed">
+        <header class="feed-header">
+            <h1>Latest Market Intelligence</h1>
+            <div class="live-indicator">
+                <span class="dot"></span> Live Scan
+            </div>
+        </header>
+
+        <div class="articles-list">
+            <div class="article-row" *ngFor="let article of filteredArticles">
+
+                <!-- LEFT: Sentiment Strip -->
+                <div class="sentiment-strip" [style.background-color]="getSentimentColor(article.sentimentScore)"></div>
+
+                <!-- CENTER: Content -->
+                <div class="article-content">
+                    <div class="article-header">
+                        <h3 class="article-title">{{ article.title }}</h3>
+                        <span class="article-source">{{ article.source }} • {{ article.timestamp | date:'shortTime' }} •
+                            {{ article.timestamp | date:'longDate' }}</span>
+                    </div>
+
+                    <div class="article-tags">
+                        <span *ngFor="let tag of article.tags" class="tag" [attr.data-cat]="tag.category">
+                            {{ tag.label }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- RIGHT: Score -->
+                <div class="article-score">
+                    <span class="score-val" [style.color]="getSentimentColor(article.sentimentScore)">
+                        {{ article.sentimentScore > 0 ? '+' : '' }}{{ article.sentimentScore | number:'1.2-2' }}
+                    </span>
+                    <span class="score-label">{{ article.sentimentLabel }}</span>
+                </div>
+
+            </div>
+        </div>
+    </main>
+</div>

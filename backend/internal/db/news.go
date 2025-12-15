@@ -1,0 +1,118 @@
+package db
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+)
+
+// Article structure matches the Python API response
+type Article struct {
+	ID             string  `json:"id"`
+	Title          string  `json:"title"`
+	Source         string  `json:"source"`
+	Timestamp      string  `json:"timestamp"` // published_at
+	SentimentScore float64 `json:"sentimentScore"`
+	SentimentLabel string  `json:"sentimentLabel"`
+	Tags           any     `json:"tags"` // JSON array or struct, kept as any for flexible encoding
+	Link           string  `json:"link"` // url
+}
+
+// SaveArticles inserts new articles into the database
+func SaveArticles(articles []Article) error {
+	tx, err := DB.BeginTx(context.Background(), nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare(`
+		INSERT INTO news_articles (id, title, source, url, published_at, sentiment_score, sentiment_label, tags)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO NOTHING
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, a := range articles {
+		// Convert Tags to JSON string
+		tagsJSON, _ := json.Marshal(a.Tags)
+
+		_, err = stmt.Exec(
+			a.ID,
+			a.Title,
+			a.Source,
+			a.Link,
+			a.Timestamp,
+			a.SentimentScore,
+			a.SentimentLabel,
+			string(tagsJSON),
+		)
+		if err != nil {
+			log.Printf("Error inserting article %s: %v", a.Title, err)
+			continue
+		}
+	}
+
+	return tx.Commit()
+}
+
+// SearchNews searches for articles using FTS5 (full text search)
+func SearchNews(query string, limit int) ([]Article, error) {
+	if query == "" {
+		return nil, fmt.Errorf("empty query")
+	}
+
+	// Use FTS5 MATCH operator
+	// We join with the main table to get full details (unless using contentless option, but we used external content)
+	// Actually, we used content='news_articles', so we query news_fts and it pulls from news_articles.
+	// But `SELECT * FROM news_fts WHERE ...` only returns the indexed columns (title, source, tags).
+	// We need all columns.
+	// Common pattern: SELECT * FROM news_articles WHERE rowid IN (SELECT rowid FROM news_fts WHERE news_fts MATCH ?)
+
+	rows, err := DB.Query(`
+		SELECT id, title, source, url, published_at, sentiment_score, sentiment_label, tags 
+		FROM news_articles 
+		WHERE rowid IN (
+			SELECT rowid FROM news_fts WHERE news_fts MATCH ? ORDER BY rank
+		)
+		LIMIT ?
+	`, query, limit)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []Article
+	for rows.Next() {
+		var a Article
+		var tagsStr string
+		err := rows.Scan(
+			&a.ID,
+			&a.Title,
+			&a.Source,
+			&a.Link,
+			&a.Timestamp,
+			&a.SentimentScore,
+			&a.SentimentLabel,
+			&tagsStr,
+		)
+		if err != nil {
+			log.Println("Error scanning row:", err)
+			continue
+		}
+
+		// Unmarshal string tags back to any/interface
+		if err := json.Unmarshal([]byte(tagsStr), &a.Tags); err != nil {
+			// fallback: empty list
+			a.Tags = []interface{}{}
+		}
+		results = append(results, a)
+	}
+
+	return results, nil
+}

@@ -1,14 +1,106 @@
 <div class="settings-page">
   <h1>⚙️ Settings</h1>
-  <div class="api-status-box">
-    <h2>API Status</h2>
-    <table>
-      <tr *ngFor="let api of apis">
-        <td class="api-name">{{ api.name }}</td>
-        <td>
-          <span class="status-dot" [class.active]="api.active"></span>
-        </td>
-      </tr>
-    </table>
+
+  <div class="settings-grid">
+
+    <!-- SYSTEM STATUS CARD -->
+    <div class="settings-card">
+      <h2>🖥️ System Status</h2>
+      <div class="status-list">
+        <div class="status-item">
+          <span class="status-label">Backend Connection</span>
+          <span class="status-value">
+            <span class="status-indicator" [class.online]="backendOnline" [class.offline]="!backendOnline"></span>
+            {{ backendOnline ? 'Online' : 'Offline' }}
+          </span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">Latency</span>
+          <span class="status-value">{{ latency }}ms</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">App Version</span>
+          <span class="status-value">v0.8.2</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">Cache Size</span>
+          <span class="status-value">{{ cacheSize }}</span>
+        </div>
+        <div style="margin-top: 15px; display: flex; justify-content: flex-end;">
+          <button class="btn-secondary" (click)="checkSystemStatus()">Creating Status...</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- API CONFIG CARD -->
+    <div class="settings-card">
+      <h2>🔑 API Configuration</h2>
+
+      <div class="form-group">
+        <label>Finnhub API Key</label>
+        <div class="input-row">
+          <input type="password" [(ngModel)]="keys.finnhub" placeholder="Enter Finnhub Key">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Alpha Vantage Key</label>
+        <div class="input-row">
+          <input type="password" [(ngModel)]="keys.alpha" placeholder="Enter Alpha Vantage Key">
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 10px;">
+        <button class="btn-primary" (click)="saveKeys()">Save Keys</button>
+        <button class="btn-secondary" (click)="testKeys()">Test Keys</button>
+      </div>
+    </div>
+
+    <!-- PREFERENCES CARD -->
+    <div class="settings-card">
+      <h2>🎨 Preferences</h2>
+
+      <div class="pref-item">
+        <div class="pref-label">
+          <span>Default Timeframe</span>
+          <div class="pref-desc">Range shown on charts by default</div>
+        </div>
+        <select [(ngModel)]="preferences.timeframe"
+          style="padding: 8px; border-radius: 6px; background: rgba(0,0,0,0.3); color: white; border: 1px solid #444;">
+          <option value="1D">1 Day</option>
+          <option value="1M">1 Month</option>
+          <option value="1Y">1 Year</option>
+        </select>
+      </div>
+
+      <div class="pref-item">
+        <div class="pref-label">
+          <span>Auto-Refresh</span>
+          <div class="pref-desc">Update portfolio data automatically</div>
+        </div>
+        <input type="checkbox" [(ngModel)]="preferences.autoRefresh" style="transform: scale(1.2);">
+      </div>
+
+      <div class="pref-item">
+        <div class="pref-label">
+          <span>Show Animations</span>
+          <div class="pref-desc">Enable UI transitions and effects</div>
+        </div>
+        <input type="checkbox" [(ngModel)]="preferences.animations" style="transform: scale(1.2);">
+      </div>
+    </div>
+
+    <!-- DANGER ZONE -->
+    <div class="settings-card" style="border-color: rgba(255,82,82,0.3);">
+      <h2 style="color: #ff5252;">⚠️ Danger Zone</h2>
+      <p style="color: #aaa; font-size: 13px; margin-bottom: 20px;">
+        These actions are irreversible.
+      </p>
+
+      <button class="btn-danger" (click)="clearCache()">Clear Application Cache</button>
+      <div style="height: 10px;"></div>
+      <button class="btn-danger" (click)="resetPortfolio()">Reset Portfolio Data</button>
+    </div>
+
   </div>
 </div>

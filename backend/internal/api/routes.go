@@ -1,7 +1,10 @@
 package api
 
 import (
+	"backend/internal/db"
 	"backend/internal/fetch"
+	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 
@@ -111,6 +114,64 @@ func RegisterRoutes(router *gin.Engine) {
 			}
 			defer resp.Body.Close()
 			c.DataFromReader(http.StatusOK, resp.ContentLength, "application/json", resp.Body, nil)
+		})
+
+		//  Real News (Fetch + Save)
+		r.GET("/news", func(c *gin.Context) {
+			symbols := c.Query("symbols")
+
+			resp, err := http.Get("http://localhost:8000/news?symbols=" + symbols)
+			if err != nil {
+				log.Println("Error contacting Python service for news:", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			defer resp.Body.Close()
+
+			// Read body
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read upstream response"})
+				return
+			}
+
+			// Parse to save
+			var articles []db.Article
+			if err := json.Unmarshal(body, &articles); err == nil {
+				// Async save to not block UI
+				go func() {
+					if err := db.SaveArticles(articles); err != nil {
+						log.Printf("Failed to save articles: %v", err)
+					}
+				}()
+			} else {
+				log.Printf("Failed to unmarshal news for saving: %v", err)
+			}
+
+			// Return original JSON to client
+			c.Data(http.StatusOK, "application/json", body)
+		})
+
+		//  Search News (Historical)
+		r.GET("/news/search", func(c *gin.Context) {
+			query := c.Query("q")
+			if query == "" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "q (query) parameter required"})
+				return
+			}
+
+			results, err := db.SearchNews(query, 50)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			// If empty, return empty list []
+			if results == nil {
+				results = []db.Article{}
+			}
+
+			c.JSON(http.StatusOK, results)
 		})
 
 		//  Search Autocomplete

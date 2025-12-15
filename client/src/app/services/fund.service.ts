@@ -62,6 +62,16 @@ export class FundService {
     );
   }
 
+  getNews(symbols: string[] = []): Observable<any[]> {
+    const query = symbols.join(',');
+    return this.http.get<any[]>(`/api/news?symbols=${query}`).pipe(
+      catchError(err => {
+        console.error('News fetch error:', err);
+        return of([]);
+      })
+    );
+  }
+
   searchStocks(query: string): Observable<any[]> {
     if (!query) return of([]);
     return this.http.get<any[]>(`/api/search?q=${query}`).pipe(

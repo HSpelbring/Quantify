@@ -64,9 +64,9 @@ export class DashboardComponent implements OnInit, AfterViewInit {
         const chart = new Chart(ctx, {
           type: 'line',
           data: {
-            labels: fund.history.map((_, idx) => idx),
+            labels: (fund.history || []).map((_, idx) => idx),
             datasets: [{
-              data: fund.history,
+              data: fund.history || [],
               borderColor: color,
               borderWidth: 2,
               pointRadius: 0,

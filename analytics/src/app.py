@@ -1,4 +1,5 @@
 
+# Last updated: Real News Integration (Fixed Parsing)
 from fastapi import FastAPI
 from analytics.insights import generate_insight
 import yfinance as yf
@@ -9,6 +10,19 @@ import requests
 import pandas as pd
 import io
 import os
+from datetime import datetime
+import random
+import re
+import nltk
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+
+# Initialize NLTK
+try:
+    nltk.data.find('sentiment/vader_lexicon.zip')
+except LookupError:
+    nltk.download('vader_lexicon')
+
+sia = SentimentIntensityAnalyzer()
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"])
@@ -127,6 +141,354 @@ def get_analyst_ratings(ticker, info):
 def get_insights():
     data = generate_insight()
     return data
+
+# -------------------------------------------------------------------------
+# REAL NEWS FETCHING & TAGGING
+# -------------------------------------------------------------------------
+
+# Global Whitelist of Tracked Entities (Stocks & Funds)
+# Only articles mentioning these will pass the filter (if strict mode enabled)
+KNOWN_ENTITIES = {
+    # Tech / Mag 7
+    "apple": "AAPL", "aapl": "AAPL",
+    "microsoft": "MSFT", "msft": "MSFT",
+    "nvidia": "NVDA", "nvda": "NVDA",
+    "alphabet": "GOOG", "google": "GOOG", "goog": "GOOG", "googl": "GOOG",
+    "amazon": "AMZN", "amzn": "AMZN",
+    "meta": "META", "facebook": "META",
+    "tesla": "TSLA", "tsla": "TSLA",
+    
+    # Semi
+    "amd": "AMD", 
+    "broadcom": "AVGO", 
+    "intel": "INTC", "intc": "INTC",
+    "micron": "MU", "mu": "MU",
+    "tsmc": "TSM",
+    
+    # Major Funds / Indices
+    "spy": "SPY", "s&p 500": "SPY", "sp500": "SPY",
+    "qqq": "QQQ", "nasdaq": "QQQ", "ndx": "QQQ",
+    "dia": "DIA", "dow jones": "DIA", "dow": "DIA",
+    "iwm": "IWM", "russell 2000": "IWM",
+    "vix": "VIX",
+    
+    # Other Blue Chips
+    "netflix": "NFLX", "nflx": "NFLX",
+    "disney": "DIS", "dis": "DIS",
+    "jpmorgan": "JPM", "jpm": "JPM",
+    "coca cola": "KO", "ko": "KO",
+    "pepsi": "PEP", "pep": "PEP",
+    "walmart": "WMT", "wmt": "WMT",
+    "costco": "COST", "cost": "COST",
+    "dell": "DELL", "uber": "UBER", "oracle": "ORCL"
+}
+
+def load_dynamic_tickers():
+    """
+    Fetches S&P 500 list from Wikipedia to populate the whitelist dynamically.
+    Fail-safe: fallbacks to manual list if this fails.
+    """
+    print("Loading S&P 500 symbols from Wikipedia...")
+    try:
+        # Wikipedia blocks python-requests/pandas default UA, need browser UA
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+        r = requests.get('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies', headers=headers)
+        
+        # Parse HTML string
+        tables = pd.read_html(io.StringIO(r.text))
+        df = tables[0] # First table
+        
+        count = 0
+        for _, row in df.iterrows():
+            sym = row['Symbol'].replace(".", "-") # BRK.B -> BRK-B standard
+            name = str(row['Security'])
+            
+            # Map Symbol
+            KNOWN_ENTITIES[sym.lower()] = sym
+            
+            # Map Name (Cleaned)
+            # Remove legal suffixes to find "Adobe" from "Adobe Inc."
+            clean = name.lower()
+            for suffix in [" inc.", " corp.", " plc", " co.", " company", " ltd.", " group", " holdings", " trust"]:
+                clean = clean.replace(suffix, "")
+            
+            KNOWN_ENTITIES[clean] = sym
+            
+            # Heuristic: Map first word if distinct (e.g. "Adobe")
+            # Avoid generic words: "General" (General Motors vs General Electric), "Western", "United"
+            first = clean.split()[0]
+            if len(first) >= 4 and first not in ["american", "united", "general", "national", "first", "northern", "southern", "western", "eastern", "public", "citizens"]:
+                if first not in KNOWN_ENTITIES:
+                    KNOWN_ENTITIES[first] = sym
+            
+            count += 1
+            
+        print(f"Successfully loaded {count} S&P 500 companies into whitelist.")
+            
+    except Exception as e:
+        print(f"Warning: Could not load S&P 500 list (using manual whitelist only). Error: {e}")
+
+# Load immediately on startup (async in bg might be better but this is fast enough)
+load_dynamic_tickers()
+
+def auto_tag_news(title: str, summary: str = ""):
+    """
+    Enhanced keyword-based tagger.
+    Scans for Sentiment, Categories, AND Tickers/Company Names.
+    """
+    text = (title + " " + summary).lower()
+    tags = []
+
+    # --- 1. ENTITY EXTRACTION (Global Lookup with Strict Tokens) ---
+    found_syms = set()
+    
+    # Tokenize: Split by non-alphanumeric
+    raw_tokens = re.split(r'[^a-zA-Z0-9]+', text) # text is lower here... wait.
+    # The function first line is `text = (title + " " + summary).lower()`
+    # I need case-sensitive tokens!
+    
+    # Recover cased text
+    full_text_cased = title + " " + summary
+    tokens_cased = set(re.split(r'[^a-zA-Z0-9]+', full_text_cased))
+    tokens_lower = set(t.lower() for t in tokens_cased)
+    
+    for key, sym in KNOWN_ENTITIES.items():
+        # filter out very common words that might be in S&P 500 names
+        # e.g. "Target" -> TGT, "Best" -> BBY, "Gap" -> GPS
+        # We manually blacklist them if needed, or rely on lowercase.
+        if key in ["target", "best", "gap", "now", "pool", "match", "corp", "inc"]:
+             # Require strict connection? or blacklist completely?
+             if key == "target" and "tgt" in tokens_lower: found_syms.add(sym)
+             continue
+             
+        # Short Ticker Safety (length <= 2) -> Require UPPERCASE match
+        # e.g. "A", "F", "T", "ON", "SO"
+        if len(key) <= 2 and key == sym.lower():
+             if sym in tokens_cased:
+                 # Check if it's not part of a word? Regex split handles that.
+                 # " SO " matches. "SO" matches. "ALSO" -> "also" (split).
+                 # Main risk: "A" at start of sentence. 
+                 # "A stock..." -> "A" is in tokens_cased.
+                 # Filter Single Letters?
+                 if len(key) == 1:
+                     continue # Skip single letter tickers (A, F, T, O, etc) to avoid noise
+                 found_syms.add(sym)
+        else:
+             # Normal Match (Names or Long Tickers)
+             if key in tokens_lower:
+                 found_syms.add(sym)
+
+    for sym in found_syms:
+        tags.append({"label": sym, "category": "Stock"})
+
+    # --- 2. SENTIMENT REASONS (Granular) ---
+    # POSITIVE INDICATORS
+    if any(x in text for x in ["beat", "surpass", "crush", "topple"]):
+        tags.append({"label": "Earnings Beat", "category": "Positive"})
+    if any(x in text for x in ["upgrade", "buy rating", "raised price", "outperform"]):
+        tags.append({"label": "Analyst Upgrade", "category": "Positive"})
+    if any(x in text for x in ["record", "high", "soar", "surge", "jump", "rally", "skyrocket"]):
+        tags.append({"label": "Price Surge", "category": "Positive"})
+    if any(x in text for x in ["gain", "growth", "climb", "rise", "bull"]):
+        tags.append({"label": "Momentum", "category": "Positive"})
+
+    # NEGATIVE INDICATORS
+    if any(x in text for x in ["miss", "lag", "short of"]):
+        tags.append({"label": "Earnings Miss", "category": "Negative"})
+    if any(x in text for x in ["downgrade", "sell rating", "cut price", "underperform"]):
+        tags.append({"label": "Analyst Downgrade", "category": "Negative"})
+    if any(x in text for x in ["drop", "fall", "plunge", "slide", "crash", "slump", "dive", "low"]):
+        tags.append({"label": "Price Drop", "category": "Negative"})
+    if any(x in text for x in ["loss", "decline", "weak", "bear", "down"]):
+        tags.append({"label": "Decline", "category": "Negative"})
+
+    # -- CORPORATE --
+    if any(x in text for x in ["dividend", "buyback", "merger", "acquisition", "acquire", "partnership", "appoint", "ceo", "cfo", "earnings", "quarter"]):
+        tags.append({"label": "Corporate Action", "category": "Corporate"})
+
+    # -- LEGAL --
+    if any(x in text for x in ["sue", "lawsuit", "settle", "investigation", "probe", "fine", "court", "regulatory", "sec ", "antitrust", "ban"]):
+        tags.append({"label": "Legal/Regulatory", "category": "Legal"})
+
+    # -- ANALYST --
+    if any(x in text for x in ["analyst", "target", "fitch", "moody", "morgan", "goldman", "upgrade", "downgrade", "estimate"]):
+        tags.append({"label": "Analyst Update", "category": "Analyst"})
+
+    # -- SECTOR (Approximation) --
+    if any(x in text for x in ["tech", "ai ", "software", "cloud", "chip", "semiconductor", "cyber"]):
+        tags.append({"label": "Technology", "category": "Sector"})
+    if any(x in text for x in ["oil", "gas", "energy", "solar", "wind", "electric"]):
+        tags.append({"label": "Energy", "category": "Sector"})
+    if any(x in text for x in ["drug", "pharma", "trial", "fda", "biotech"]):
+        tags.append({"label": "Healthcare", "category": "Sector"})
+    if any(x in text for x in ["bank", "rate", "fed ", "inflation", "finance", "crypto", "bitcoin"]):
+        tags.append({"label": "Finance/Macro", "category": "Sector"})
+    if any(x in text for x in ["retail", "consumer", "sales", "spending"]):
+        tags.append({"label": "Retail", "category": "Sector"})
+    if any(x in text for x in ["auto", "car", "vehicle", "ev "]):
+        tags.append({"label": "Automotive", "category": "Sector"})
+
+    # Default if empty
+    if not tags:
+        tags.append({"label": "General News", "category": "Sector"})
+
+    return tags
+
+def is_relevant_news(title: str) -> bool:
+    """
+    Returns False if the article is deemed 'junk' or 'noise' (clickbait, personal finance, etc.)
+    """
+    text = title.lower()
+    
+    # Allow-list high quality signals regardless of noise? No, filter aggressively first.
+    
+    noise_keywords = [
+        "dave ramsey", "suze orman", "kiyosaki", "rich dad", 
+        "motley fool", "zacks", "seeking alpha",
+        "emergency fund", "401(k)", "401k", "retirement", 
+        "social security", "credit card", "mortgage", "student loan",
+        "how to invest", "millionaire", "become rich",
+        "shiba inu", "doge", "meme coin", # unless user specifically asked for crypto?
+        "top stocks to buy", "prediction", "forecast" # clickbait usually
+    ]
+    
+    if any(n in text for n in noise_keywords):
+        return False
+        
+    return True
+
+@app.get("/news")
+def get_market_news(symbols: str = ""):
+    """
+    Fetch news for a comma-separated list of symbols.
+    If empty, fetches general market news via a default list.
+    """
+    targets = [s.strip().upper() for s in symbols.split(",") if s.strip()]
+    
+    # Default watch list if none provided
+    if not targets:
+        targets = ["AAPL", "TSLA", "NVDA", "MSFT", "GOOG", "AMZN", "AMD", "SPY"]
+    
+    all_news = []
+    seen_titles = set()
+
+    for sym in targets:
+        try:
+            ticker = yf.Ticker(sym)
+            raw_news = ticker.news
+            
+            # Limiting to 5 recent items per ticker to keep response fast but diverse
+            for item in raw_news[:5]:
+                # Handle nested 'content' structure if present (yfinance update)
+                content = item.get("content", item) 
+                
+                title = content.get("title", item.get("title", ""))
+                if title in seen_titles:
+                    continue
+
+                # Filter out junk/noise
+                if not is_relevant_news(title):
+                    continue
+
+                seen_titles.add(title)
+                
+                # Extract provider/publisher
+                # structure varies: might be 'provider': {'displayName': '...'} or just 'publisher' string
+                provider = "Yahoo Finance"
+                if "provider" in content:
+                    prov_data = content["provider"]
+                    if isinstance(prov_data, dict):
+                        provider = prov_data.get("displayName", "Yahoo Finance")
+                    else:
+                        provider = str(prov_data)
+                elif "publisher" in content:
+                    provider = content["publisher"]
+
+                # Extract link (Safe Handling of dict vs string)
+                raw_link = content.get("canonicalUrl") or content.get("link") or content.get("clickThroughUrl")
+                link = ""
+                
+                if isinstance(raw_link, dict):
+                     link = str(raw_link.get("url", ""))
+                elif isinstance(raw_link, str):
+                     link = str(raw_link)
+                
+                # Extract timestamp (Parse pubDate which is ISO string)
+                pub_date_str = content.get("pubDate")
+                pub_time_raw = 0.0
+                display_time = ""
+
+                if pub_date_str:
+                    try:
+                        # Parse ISO string "2023-12-15T14:30:00Z"
+                        # fromisoformat requires +00:00 instead of Z in older python, but safer to replace
+                        dt = datetime.fromisoformat(pub_date_str.replace("Z", "+00:00"))
+                        pub_time_raw = dt.timestamp()
+                        display_time = pub_date_str
+                    except Exception as e:
+                        print(f"Date parse error: {e}")
+                        pub_time_raw = time.time()
+                        display_time = datetime.fromtimestamp(pub_time_raw).isoformat()
+                else:
+                    # Fallback if no pubDate
+                    pub_time_raw = item.get("providerPublishTime", time.time())
+                    display_time = datetime.fromtimestamp(pub_time_raw).isoformat()
+
+
+                # Auto-Tagging
+                # We NO LONGER blindly add the queried symbol. 
+                # Strict Whitelist Mode: Article must explicitly mention a known entity in Title/Text.
+                tags = auto_tag_news(title)
+                
+                # Check if any Stock/Fund was found in the title
+                has_tracked_entity = any(t['category'] == 'Stock' for t in tags)
+                
+                if not has_tracked_entity:
+                    # Drop article if it doesn't mention something we care about
+                    continue
+                
+                # If we kept it, we can optionally add the queried 'sym' if it wasn't found but we trust the source?
+                # User said "reverse system... if stock... included". Strict is safer.
+                # But what if "iPhone sales up" (implies AAPL)? My map has "apple".
+                # If I want to be safe, I rely on the map.
+                
+                # Sentiment Analysis
+                sentiment_score = 0.0
+                sentiment_label = "Neutral"
+                
+                try:
+                    scores = sia.polarity_scores(title)
+                    sentiment_score = scores['compound']
+                    if sentiment_score >= 0.05:
+                        sentiment_label = "Positive"
+                        # De-conflict: Remove Negative tags (e.g. 'Drop') if overall sentiment is mainly Positive
+                        tags = [t for t in tags if t['category'] != 'Negative']
+                    elif sentiment_score <= -0.05:
+                        sentiment_label = "Negative"
+                         # De-conflict: Remove Positive tags (e.g. 'Gain') if overall sentiment is mainly Negative
+                        tags = [t for t in tags if t['category'] != 'Positive']
+                except Exception:
+                    pass
+
+                all_news.append({
+                    "id": item.get("id", item.get("uuid", str(time.time()))),
+                    "title": title,
+                    "source": provider,
+                    "timestamp": display_time, 
+                    "sentimentScore": sentiment_score,
+                    "sentimentLabel": sentiment_label,
+                    "tags": tags,
+                    "link": link
+                })
+        except Exception as e:
+            print(f"Error fetching news for {sym}: {e}")
+            continue
+
+    # Sort by Most Recent (ISO strings sort correctly)
+    all_news.sort(key=lambda x: x["timestamp"], reverse=True)
+    return all_news
 
 
 @app.get("/price/{symbol}")
