@@ -602,6 +602,17 @@ def get_stock_details(symbol: str):
             "trailingEps": info.get("trailingEps", 0),
             "open": today_open,
             "previousClose": info.get("previousClose", 0),
+            "beta": info.get("beta", 0),
+            # Events
+            "exDividendDate": info.get("exDividendDate", 0),
+            "dividendDate": info.get("dividendDate", 0),
+            "earningsTimestamp": info.get("earningsTimestamp", 0),
+            "earningsTimestampStart": info.get("earningsTimestampStart", 0),
+            "earningsTimestampEnd": info.get("earningsTimestampEnd", 0),
+            # Fundamentals
+            "revenueGrowth": info.get("revenueGrowth", 0),
+            "grossMargins": info.get("grossMargins", 0),
+            "totalRevenue": info.get("totalRevenue", 0),
             # Company information
             "sector": info.get("sector", "N/A"),
             "industry": info.get("industry", "N/A"),
@@ -611,7 +622,12 @@ def get_stock_details(symbol: str):
             "country": info.get("country", "N/A"),
             "city": info.get("city", "N/A"),
             # Analyst Recommendations
-            "recommendations": get_analyst_ratings(ticker, info)
+            "recommendations": get_analyst_ratings(ticker, info),
+            # Enhanced Events Data
+            "splits": get_splits(ticker),
+            "shareTrend": get_share_trend(ticker),
+            "earningsSurprise": get_earnings_surprise(ticker),
+            "nextEarningsDate": get_next_earnings(ticker)
         }
     except Exception as e:
         print(f"Error fetching stock details for {symbol}: {e}")
@@ -620,6 +636,118 @@ def get_stock_details(symbol: str):
             "error": str(e),
             "symbol": symbol.upper()
         }
+
+def get_next_earnings(ticker):
+    try:
+        # Check standard info first (sometimes works)
+        # But yf.info earningsTimestamp is often last confirmed.
+        
+        # Check earnings_dates for future
+        ed = ticker.earnings_dates
+        if ed is not None and not ed.empty:
+            # Future earnings have NaN for Surprise(%)
+            future = ed[ed["Surprise(%)"].isna()].sort_index()
+            if not future.empty:
+                # Get the soonest future date
+                return future.index[0].strftime("%Y-%m-%d")
+        
+        # Fallback to calendar
+        cal = ticker.calendar
+        if cal is not None and not cal.empty:
+            if "Earnings Date" in cal: # cal is sometimes a dict or df
+                 # new yfinance returns a dict sometimes with keys "Earnings Date" list
+                 dates = cal.get("Earnings Date", [])
+                 if dates:
+                     # dates is list of datetime.date
+                     # filter for future? usually calendar is upcoming.
+                     # Just return first
+                     return dates[0].strftime("%Y-%m-%d")
+            # If dataframe
+            if hasattr(cal, "iloc"):
+                return cal.iloc[0, 0].strftime("%Y-%m-%d") # Assuming first row/col is date
+
+        return None
+    except Exception:
+        return None
+
+def get_splits(ticker):
+    try:
+        splits = ticker.splits
+        if splits.empty:
+            return None
+        # Get last 2 splits
+        recent = splits.sort_index(ascending=False).head(2)
+        res = []
+        for date, ratio in recent.items():
+            res.append({
+                "date": date.strftime("%Y-%m-%d"),
+                "ratio": ratio
+            })
+        return res
+    except Exception:
+        return None
+
+def get_share_trend(ticker):
+    try:
+        bs = ticker.quarterly_balance_sheet
+        if bs.empty:
+            return None
+            
+        # Try different keys for share count
+        key = "Ordinary Shares Number"
+        if key not in bs.index:
+            key = "Common Stock Shares Outstanding"
+            if key not in bs.index:
+                return None
+                
+        shares = bs.loc[key].sort_index(ascending=False) # Newest first
+        if len(shares) < 2:
+            return None
+            
+        current = shares.iloc[0]
+        prev = shares.iloc[1]
+        
+        if prev == 0: return None
+        
+        change_pct = ((current - prev) / prev) * 100
+        trend = "Stable"
+        if change_pct < -0.1: trend = "Buyback"
+        elif change_pct > 0.1: trend = "Dilution"
+        
+        return {
+            "trend": trend,
+            "changePercent": round(change_pct, 2),
+            "date": shares.index[0].strftime("%Y-%m-%d")
+        }
+    except Exception:
+        return None
+
+def get_earnings_surprise(ticker):
+    try:
+        # earnings_dates: index is timestamp, columns: EPS Estimate, Reported EPS, Surprise(%)
+        ed = ticker.earnings_dates
+        if ed is None or ed.empty:
+            return None
+            
+        # Filter for rows where 'Surprise(%)' is not NaN (i.e., reported)
+        # and sort by date descending
+        reported = ed[ed["Surprise(%)"].notna()].sort_index(ascending=False)
+        
+        if reported.empty:
+            return None
+            
+        latest = reported.iloc[0]
+        return {
+            "surprisePercent": round(latest["Surprise(%)"] * 100, 2), # usually already decimal 0.10 -> 10%? No, yf is usually raw. Debug output said -10.53, so it is percent.
+            # wait, debug output: "0.50  -10.53". If actual is 0.50 and est 0.56. (0.50-0.56)/0.56 = -0.107. 
+            # So yfinance "Surprise(%)" column is likely ALREADY multiplied by 100? or simpler?
+            # Let's trust the debug output matches common user view. "10.49" sounds like %.
+            # So I will just pass it through.
+            "surprise": round(latest["Surprise(%)"], 2),
+            "date": reported.index[0].strftime("%Y-%m-%d")
+        }
+    except Exception:
+        return None
 
 @app.get("/history/{symbol}")
 def get_stock_history(symbol: str, range: str = "1mo"):

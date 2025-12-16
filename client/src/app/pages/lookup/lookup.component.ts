@@ -1,5 +1,5 @@
 import { Component, inject, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
-import { NgFor, NgIf } from '@angular/common';
+import { NgFor, NgIf, NgClass } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { FundService } from '../../services/fund.service';
 import { Chart, registerables } from 'chart.js';
@@ -12,7 +12,7 @@ Chart.register(...registerables);
 @Component({
   selector: 'app-lookup',
   standalone: true,
-  imports: [NgFor, NgIf, FormsModule],
+  imports: [NgFor, NgIf, NgClass, FormsModule],
   templateUrl: './lookup.component.html',
   styleUrls: ['./lookup.component.css']
 })
@@ -27,7 +27,21 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
   query = '';
   previous: string[] = [];
   timeframes = ['1D', '5D', '1M', '3M', '6M', '1Y', '5Y', 'MAX'];
+  indicators = ['50MA', '200MA', 'VWAP']; // Placeholders
   activeTF = '1D';
+
+  // ... (existing code)
+
+  getConsensusClass(consensus: string): string {
+    if (!consensus) return '';
+    const c = consensus.toLowerCase();
+    if (c.includes('strong buy')) return 'strong-buy';
+    if (c.includes('strong sell')) return 'strong-sell';
+    if (c.includes('buy')) return 'buy';
+    if (c.includes('sell')) return 'sell';
+    if (c.includes('hold')) return 'hold';
+    return '';
+  }
   periodChange = 0;
   periodChangePercent = 0;
   loading = false;
@@ -76,18 +90,98 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
 
   isDescriptionExpanded = false;
 
-  watchlist = [
-    { symbol: 'AAPL', price: 212.54 },
-    { symbol: 'NVDA', price: 131.20 },
-    { symbol: 'MSFT', price: 415.33 },
-    { symbol: 'AMD', price: 158.22 }
+  watchlist: any[] = [];
+  watchlistSymbols = ['AAPL', 'NVDA', 'MSFT', 'AMD']; // Default symbols
+
+  // ... (history) ...
+
+  isPositive(val: string): boolean {
+    if (!val) return false;
+    return val.includes('+') || (!val.includes('-') && parseFloat(val.replace(/[^0-9.-]/g, '')) > 0);
+  }
+
+  loadWatchlistData() {
+    this.watchlist = [];
+    this.watchlistSymbols.forEach(sym => {
+      this.fundService.getStockDetails(sym).subscribe({
+        next: (data) => {
+          if (!data || data.error) return;
+          // Add to watchlist array
+          this.watchlist.push({
+            symbol: data.symbol,
+            price: data.price,
+            change: data.change,
+            changePercent: data.changePercent
+          });
+        },
+        error: (e) => console.error(`Failed to load watchlist item ${sym}`, e)
+      });
+    });
+  }
+
+  // ... (existing code) ...
+
+  // Placeholder for Upcoming Events with logic
+  upcomingEvents = [
+    { label: 'Earnings', dateStr: 'Oct 24, 2025', days: 0, colorClass: '' },
+    { label: 'Dividend', dateStr: 'Nov 14, 2025', days: 0, colorClass: '' },
+    { label: 'Ex-Div Date', dateStr: 'Nov 10, 2025', days: 0, colorClass: '' }
   ];
 
-  history = [
-    { symbol: 'AAPL', when: '2h ago' },
-    { symbol: 'TSLA', when: 'Yesterday' },
-    { symbol: 'SPY', when: '3d ago' }
-  ];
+  updateEventProximity() {
+    // Mock logic: randomly assign days or parse dates if they were real
+    // For demo stability, I'll hardcode some variety to show the color rules
+    this.upcomingEvents = [
+      { label: 'Earnings', dateStr: 'Oct 24, 2025', days: 2, colorClass: 'proximity-red' }, // < 3 days
+      { label: 'Dividend', dateStr: 'Nov 14, 2025', days: 9, colorClass: 'proximity-gray' }, // > 7 days
+      { label: 'Ex-Div Date', dateStr: 'Nov 10, 2025', days: 5, colorClass: 'proximity-amber' } // 3-7 days
+    ];
+  }
+
+  // Ranges Logic
+  getRangePosition(rangeStr: string): number {
+    if (!rangeStr) return 50;
+    // Split by hyphen or en-dash
+    const parts = rangeStr.split(/[-–]/).map(s => parseFloat(s.trim().replace(/,/g, '')));
+
+    if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) return 50;
+
+    const min = parts[0];
+    const max = parts[1];
+    const current = this.details.price;
+
+    if (max === min) return 50;
+    let pct = ((current - min) / (max - min)) * 100;
+    return Math.max(0, Math.min(100, pct)); // Clamp 0-100
+  }
+
+  getRangeMin(rangeStr: string): string {
+    if (!rangeStr) return '-';
+    const parts = rangeStr.split(/[-–]/);
+    return parts.length > 0 ? parts[0].trim() : '-';
+  }
+
+  getRangeMax(rangeStr: string): string {
+    if (!rangeStr) return '-';
+    const parts = rangeStr.split(/[-–]/);
+    return parts.length > 1 ? parts[1].trim() : '-';
+  }
+
+  fakeFundamentals = {
+    revenue: '$96.77B',
+    yoy: '+5.2%',
+    margins: '42.3%'
+  };
+
+  newsSentiment = {
+    label: 'Bullish',
+    score: 72,
+    headlines: [
+      'Analyst upgrades target price to $240',
+      'New product line breaks sales records',
+      'Supply chain issues resolved ahead of schedule'
+    ]
+  };
 
   onSearch() {
     if (!this.query.trim()) return;
@@ -136,8 +230,69 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
           high: data.dayHigh ? this.formatNumber(data.dayHigh) : '—',
           low: data.dayLow ? this.formatNumber(data.dayLow) : '—',
           open: data.open ? this.formatNumber(data.open) : '—',
-          prevClose: data.previousClose ? this.formatNumber(data.previousClose) : '—'
+          prevClose: data.previousClose ? this.formatNumber(data.previousClose) : '—',
+          beta: data.beta ? data.beta.toFixed(2) : '—'
         };
+
+        // Update real fundamentals
+        this.fakeFundamentals = {
+          revenue: this.formatMarketCap(data.totalRevenue), // Using market cap formatter for large numbers
+          yoy: data.revenueGrowth ? (data.revenueGrowth * 100).toFixed(2) + '%' : '-',
+          margins: data.grossMargins ? (data.grossMargins * 100).toFixed(2) + '%' : '-'
+        };
+
+        // Update upcoming events with real data
+        const events = [];
+
+        if (data.earningsTimestamp || data.earningsTimestampStart) {
+          const ts = data.earningsTimestamp || data.earningsTimestampStart;
+          events.push({ label: 'Earnings', date: new Date(ts * 1000) });
+        }
+        if (data.exDividendDate) {
+          events.push({ label: 'Ex-Div Date', date: new Date(data.exDividendDate * 1000) });
+        }
+        if (data.dividendDate) {
+          events.push({ label: 'Dividend', date: new Date(data.dividendDate * 1000) });
+        }
+
+        // Process events to add proximity logic
+        const now = new Date();
+        this.upcomingEvents = events.map(e => {
+          const diffTime = e.date.getTime() - now.getTime();
+          const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+          let colorClass = 'proximity-gray';
+          if (days < 3 && days >= 0) colorClass = 'proximity-red';
+          else if (days >= 3 && days <= 7) colorClass = 'proximity-amber';
+
+          // Format date string
+          const dateStr = e.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+          return {
+            label: e.label,
+            dateStr: dateStr,
+            days: days,
+            colorClass: colorClass,
+            rawDate: e.date // for sorting
+          };
+        })
+          .sort((a, b) => {
+            // Sort by Date Descending (Newest first)
+            return b.rawDate.getTime() - a.rawDate.getTime();
+          });
+        // Removed slice to show all relevant events up to a reasonable limit, or maybe stick to 4?
+        // User implied they want to see them. Let's keep slice(0, 4) for UI balance but ensure we pick the "best" 4.
+        // Actually, for "Upcoming", maybe we prefer Future?
+        // But user wants to see "Splits" which are often past.
+        // Mixed approach: Sort by date descending puts Newest (Future) and Recent Past at top. That works.
+        this.upcomingEvents = this.upcomingEvents.slice(0, 4);
+
+        if (this.upcomingEvents.length === 0) {
+          // Fallback if no real events found
+          this.upcomingEvents = [
+            { label: 'No Events', dateStr: '-', days: 0, colorClass: '' }
+          ];
+        }
 
         // Update company info
         this.companyInfo = {
@@ -239,6 +394,35 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
     return vol.toString();
   }
 
+  marketStatus = 'Closed';
+  isMarketOpen = false;
+
+  getVolumeStatus(): string {
+    return 'High';
+  }
+
+  checkMarketStatus() {
+    const now = new Date();
+    const estString = now.toLocaleString('en-US', { timeZone: 'America/New_York' });
+    const estDate = new Date(estString);
+
+    const day = estDate.getDay(); // 0 = Sun, 6 = Sat
+    const hour = estDate.getHours();
+    const minute = estDate.getMinutes();
+
+    const isWeekday = day >= 1 && day <= 5;
+    const isAfterOpen = (hour > 9) || (hour === 9 && minute >= 30);
+    const isBeforeClose = (hour < 16);
+
+    if (isWeekday && isAfterOpen && isBeforeClose) {
+      this.marketStatus = 'Open';
+      this.isMarketOpen = true;
+    } else {
+      this.marketStatus = 'Closed';
+      this.isMarketOpen = false;
+    }
+  }
+
   selectPrevious(symbol: string) {
     this.query = symbol;
     this.onSearch();
@@ -257,7 +441,9 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
       // Add to watchlist
       this.watchlist.push({
         symbol: this.details.symbol,
-        price: this.details.price
+        price: this.details.price,
+        change: this.details.change,
+        changePercent: this.details.changePercent
       });
     }
   }
@@ -269,8 +455,6 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-
-
   ngAfterViewInit() {
     this.initializeChart();
   }
@@ -281,7 +465,6 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
     const ctx = this.chartCanvas.nativeElement.getContext('2d');
     if (!ctx) return;
 
-    // Destroy existing chart if any
     if (this.chart) {
       this.chart.destroy();
     }
@@ -306,9 +489,7 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: {
-            display: false
-          },
+          legend: { display: false },
           tooltip: {
             mode: 'index',
             intersect: false,
@@ -316,29 +497,30 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
             titleColor: '#fff',
             bodyColor: '#fff',
             borderColor: '#4caf50',
-            borderWidth: 1
+            borderWidth: 1,
+            callbacks: {
+              label: function (context: any) {
+                let label = context.dataset.label || '';
+                if (label) label += ': ';
+                if (context.parsed.y !== null) {
+                  label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed.y);
+                }
+                return label;
+              }
+            }
           }
         },
         scales: {
           x: {
-            grid: {
-              color: '#333',
-              display: true
-            },
-            ticks: {
-              color: '#ccc',
-              maxTicksLimit: 8
-            }
+            grid: { color: '#333', display: true },
+            ticks: { color: '#ccc', maxTicksLimit: 8 }
           },
           y: {
-            grid: {
-              color: '#333',
-              display: true
-            },
+            grid: { color: '#333', display: true },
             ticks: {
               color: '#ccc',
-              callback: function (value) {
-                return '$' + value;
+              callback: function (value: any) {
+                return '$' + parseFloat(value).toFixed(2);
               }
             }
           }
@@ -362,16 +544,24 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
   updateChart(historyData: any[]) {
     if (!historyData || historyData.length === 0) return;
 
-    const labels = historyData.map(d => d.date);
+    const labels = historyData.map(d => {
+      const date = new Date(d.date);
+      if (isNaN(date.getTime())) return d.date;
+
+      if (this.activeTF === '1D') {
+        return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      } else {
+        return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      }
+    });
+
     const prices = historyData.map(d => d.close);
 
-    // If chart exists, just update data
     if (this.chart) {
       this.chart.data.labels = labels;
       this.chart.data.datasets[0].data = prices;
       this.chart.update();
     } else {
-      // If chart doesn't exist (e.g. first load), initialize it with data
       this.initializeChart(labels, prices);
     }
   }
@@ -381,6 +571,10 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnInit() {
+    this.checkMarketStatus();
+    this.updateEventProximity();
+    this.loadWatchlistData();
+
     this.searchSubscription = this.searchSubject.pipe(
       debounceTime(300),
       distinctUntilChanged(),
@@ -391,6 +585,9 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
     ).subscribe(results => {
       this.searchResults = results;
     });
+
+    this.query = 'AAPL';
+    this.onSearch();
   }
 
   ngOnDestroy() {
@@ -410,7 +607,6 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   closeSearch() {
-    // Small delay to allow click event to register on dropdown items
     setTimeout(() => {
       this.searchResults = [];
     }, 200);

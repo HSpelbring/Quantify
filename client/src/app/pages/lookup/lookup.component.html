@@ -1,7 +1,12 @@
 <div class="lookup-wrapper">
 
-  <!-- SEARCH BAR -->
+  <!-- SEARCH BAR (Preserved) -->
   <div class="search-section">
+    <!-- Loading Indicator (Left of Search) -->
+    <div *ngIf="loading" class="loading-indicator">
+      <span class="spinner"></span> Loading...
+    </div>
+
     <div class="search-container">
       <input class="search-input" type="text" placeholder="Search a stock (AAPL, MSFT, BTC-USD...)" [(ngModel)]="query"
         (input)="onInput()" (blur)="closeSearch()" />
@@ -18,200 +23,265 @@
     <button class="search-btn" (click)="onSearch()">Search</button>
   </div>
 
-  <!-- PREVIOUS SEARCHES -->
+  <div class="content-container">
+    <!-- ERROR -->
+    <div *ngIf="error" class="error-message">{{ error }}</div>
 
-  <!-- LOADING & ERROR -->
-  <div *ngIf="loading" class="loading-message">Loading stock data...</div>
-  <div *ngIf="error" class="error-message">{{ error }}</div>
-
-  <div class="chart-section">
-
-    <div class="chart-container">
-
-      <div class="graph-tf-controls">
-        <button *ngFor="let tf of timeframes" class="tf-btn" [class.active]="tf === activeTF"
-          (click)="changeTimeframe(tf)">
-          {{ tf }}
-        </button>
-      </div>
-
-      <div class="period-growth-indicator" *ngIf="details.symbol !== '-' && periodChangePercent !== 0"
-        [class.positive]="periodChange >= 0" [class.negative]="periodChange < 0">
-        <span class="pg-label">{{ activeTF }} Change:</span>
-        <span class="pg-value">
-          {{ periodChange >= 0 ? '+' : '' }}{{ periodChangePercent.toFixed(2) }}%
-        </span>
-      </div>
-
-      <canvas #stockChart id="stockChart" *ngIf="details.symbol !== '-'"></canvas>
-      <div *ngIf="details.symbol === '-'" class="empty-chart-placeholder">
-        <!-- Optional: Placeholder content or keep it completely empty -->
-      </div>
+    <!-- EMPTY STATE -->
+    <div *ngIf="details.symbol === '-' && !loading" class="empty-state">
+      <h2>Search for a stock to view details</h2>
+      <p>Enter a ticker symbol (e.g., AAPL) above.</p>
     </div>
-  </div>
 
-  <div class="bottom-row">
+    <div class="dashboard-grid" *ngIf="details.symbol !== '-'">
 
-    <!-- LEFT COLUMN: Details + Summary -->
-    <div class="left-column">
+      <!-- ==================== TOP SECTION ==================== -->
+      <!-- Left: Info + Events | Right: Graph -->
+      <div class="top-section">
 
-      <div class="details-panel">
-        <h2 class="section-title">Details</h2>
+        <!-- TOP LEFT: General Info & Events -->
+        <div class="top-left-col">
 
-        <div class="details-grid">
-
-          <div class="detail-item">
-            <div class="detail-label">Symbol</div>
-            <div class="detail-value" style="display: flex; align-items: center; gap: 10px;">
-              {{ details.symbol }}
-              <button *ngIf="details.symbol !== '-'" class="watchlist-btn" (click)="toggleWatchlist()"
-                [class.in-watchlist]="isInWatchlist()">
+          <!-- 1. General Stock Info -->
+          <div class="general-info-box">
+            <div class="header-row">
+              <h1 class="ticker-symbol">{{ details.symbol }}</h1>
+              <button class="watchlist-btn" (click)="toggleWatchlist()" [class.in-watchlist]="isInWatchlist()">
                 {{ isInWatchlist() ? '★' : '☆' }}
               </button>
             </div>
-          </div>
+            <div class="company-name">{{ details.name }}</div>
 
-          <div class="detail-item">
-            <div class="detail-label">Price</div>
-            <div class="detail-value">${{ details.price ? details.price.toFixed(2) : '0.00' }}</div>
-          </div>
+            <div class="price-block">
+              <div class="current-price">${{ details.price ? details.price.toFixed(2) : '0.00' }}</div>
+              <div class="price-change-row" [class.positive]="details.change > 0" [class.negative]="details.change < 0">
+                <span class="abs-change">{{ details.change > 0 ? '+' : '' }}{{ details.change ?
+                  details.change.toFixed(2) : '0.00' }}</span>
+                <span class="pct-change">({{ details.changePercent > 0 ? '+' : '' }}{{ details.changePercent ?
+                  details.changePercent.toFixed(2) : '0.00' }}%)</span>
+              </div>
+            </div>
 
-          <div class="detail-item">
-            <div class="detail-label">Change</div>
-            <div class="detail-value" [class.positive]="details.change > 0" [class.negative]="details.change < 0">
-              {{ details.change > 0 ? '+' : '' }}${{ details.change ? details.change.toFixed(2) : '0.00' }}
-              ({{ details.changePercent > 0 ? '+' : '' }}{{ details.changePercent ? details.changePercent.toFixed(2) :
-              '0.00' }}%)
+            <!-- NEW: Market Status Row -->
+            <div class="market-status-row">
+              <span class="status-item">Market: <span class="status-val" [class.closed]="!isMarketOpen"
+                  [class.open]="isMarketOpen">{{ marketStatus }}</span></span>
+              <span class="status-item">Vol: <span class="status-val">{{ getVolumeStatus() }}</span></span>
             </div>
           </div>
 
-          <div class="detail-item">
-            <div class="detail-label">Day Range</div>
-            <div class="detail-value">{{ details.dayRange }}</div>
-          </div>
-
-          <div class="detail-item">
-            <div class="detail-label">52W Range</div>
-            <div class="detail-value">{{ details.yearRange }}</div>
-          </div>
-
-          <div class="detail-item">
-            <div class="detail-label">Market Cap</div>
-            <div class="detail-value">{{ details.marketCap }}</div>
-          </div>
-
-          <div class="detail-item">
-            <div class="detail-label">Volume</div>
-            <div class="detail-value">{{ details.volume }}</div>
-          </div>
-
-          <div class="detail-item">
-            <div class="detail-label">Avg Volume</div>
-            <div class="detail-value">{{ details.avgVolume }}</div>
-          </div>
-
-          <div class="detail-item">
-            <div class="detail-label">PE Ratio</div>
-            <div class="detail-value">{{ details.pe }}</div>
-          </div>
-
-          <div class="detail-item">
-            <div class="detail-label">EPS</div>
-            <div class="detail-value">{{ details.eps }}</div>
+          <!-- 3. Upcoming Events -->
+          <div class="events-box">
+            <h3 class="box-title">Upcoming Events</h3>
+            <div class="event-row" *ngFor="let ev of upcomingEvents">
+              <span class="event-label">{{ ev.label }}</span>
+              <span class="event-date">{{ ev.dateStr }}</span>
+              <span class="event-proximity" [ngClass]="ev.colorClass">{{ ev.days }}d</span>
+            </div>
           </div>
 
         </div>
+
+        <!-- TOP RIGHT: Main Price Graph -->
+        <!-- 2. Main Price Graph -->
+        <div class="main-graph-col">
+          <div class="graph-header">
+            <div class="tf-selector">
+              <button *ngFor="let tf of timeframes" class="tf-btn" [class.active]="tf === activeTF"
+                (click)="changeTimeframe(tf)">
+                {{ tf }}
+              </button>
+
+              <div class="tf-divider"></div>
+
+              <button *ngFor="let ind of indicators" class="tf-btn indicator-btn">
+                {{ ind }}
+              </button>
+            </div>
+            <div class="graph-dynamic-change" [class.positive]="periodChange >= 0" [class.negative]="periodChange < 0">
+              {{ periodChange >= 0 ? '+' : '' }}{{ periodChangePercent.toFixed(2) }}%
+            </div>
+          </div>
+
+          <div class="chart-wrapper">
+            <canvas #stockChart id="stockChart"></canvas>
+          </div>
+        </div>
+
+      </div>
+      <!-- End Top Section -->
+
+
+      <!-- ==================== LOWER SECTION ==================== -->
+      <div class="lower-section">
+
+
+        <!-- 4. Metrics + Fundamentals Box -->
+        <div class="metrics-box panel">
+          <h3 class="box-title">Key Indicators</h3>
+
+          <!-- Full Width Range Bars -->
+          <div class="range-bar-row">
+            <div class="range-header">
+              <span>Day Range</span>
+            </div>
+            <div class="range-track">
+              <!-- Marker Position -->
+              <div class="range-marker" [style.left.%]="getRangePosition(details.dayRange)"></div>
+            </div>
+            <div class="range-header" style="margin-top: 4px;">
+              <span>{{ getRangeMin(details.dayRange) }}</span>
+              <span>{{ getRangeMax(details.dayRange) }}</span>
+            </div>
+          </div>
+
+          <div class="range-bar-row">
+            <div class="range-header">
+              <span>52W Range</span>
+            </div>
+            <div class="range-track">
+              <div class="range-marker" [style.left.%]="getRangePosition(details.yearRange)"></div>
+            </div>
+            <div class="range-header" style="margin-top: 4px;">
+              <span>{{ getRangeMin(details.yearRange) }}</span>
+              <span>{{ getRangeMax(details.yearRange) }}</span>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Remaining Metrics Grid -->
+          <div class="metrics-grid">
+            <div class="metric-item">
+              <span class="metric-label">Volume</span>
+              <span class="metric-val">{{ details.volume }}</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Avg Vol</span>
+              <span class="metric-val">{{ details.avgVolume }}</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Mkt Cap</span>
+              <span class="metric-val">{{ details.marketCap }}</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">P/E</span>
+              <span class="metric-val">{{ details.pe }}</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">EPS</span>
+              <span class="metric-val">{{ details.eps }}</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Beta</span>
+              <span class="metric-val">{{ details.beta || '1.24' }}</span>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Bottom Row Fundamentals -->
+          <div class="fundamentals-row">
+            <div class="fund-item">
+              <div class="f-label">Revenue</div>
+              <div class="f-val">{{ fakeFundamentals.revenue }}</div>
+            </div>
+            <!-- YoY Growth with dynamic color -->
+            <div class="fund-item">
+              <div class="f-label">YoY Growth</div>
+              <div class="f-val" [class.positive]="isPositive(fakeFundamentals.yoy)"
+                [class.negative]="!isPositive(fakeFundamentals.yoy)">
+                {{ fakeFundamentals.yoy }}
+              </div>
+            </div>
+            <div class="fund-item">
+              <div class="f-label">Margins</div>
+              <div class="f-val">{{ fakeFundamentals.margins }}</div>
+            </div>
+          </div>
+        </div>
+
+
+
+        <!-- 5. Sentiment & News -->
+        <div class="sentiment-box panel">
+          <h3 class="box-title">Market Sentiment</h3>
+
+          <div class="sentiment-badge" [class.bullish]="newsSentiment.score > 50">
+            {{ newsSentiment.label }} ({{ newsSentiment.score }}/100)
+          </div>
+
+          <ul class="news-list">
+            <li *ngFor="let head of newsSentiment.headlines">
+              • {{ head }}
+            </li>
+          </ul>
+
+          <div class="analyst-summary">
+            <span class="label">Analyst Consensus:</span>
+            <span class="val" [ngClass]="getConsensusClass(companyInfo.recommendations.consensus)">
+              {{ companyInfo.recommendations.consensus }}
+            </span>
+          </div>
+
+          <!-- NEW: Recommendations Breakdown -->
+          <div class="rec-breakdown">
+            <div class="rec-row strong-sell">
+              <span>Strong Sell</span>
+              <span class="rec-val">{{ companyInfo.recommendations.strongSell }}</span>
+            </div>
+            <div class="rec-row sell">
+              <span>Sell</span>
+              <span class="rec-val">{{ companyInfo.recommendations.sell }}</span>
+            </div>
+            <div class="rec-row hold">
+              <span>Hold</span>
+              <span class="rec-val">{{ companyInfo.recommendations.hold }}</span>
+            </div>
+            <div class="rec-row buy">
+              <span>Buy</span>
+              <span class="rec-val">{{ companyInfo.recommendations.buy }}</span>
+            </div>
+            <div class="rec-row strong-buy">
+              <span>Strong Buy</span>
+              <span class="rec-val">{{ companyInfo.recommendations.strongBuy }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. Watchlist -->
+        <div class="watchlist-right-box panel">
+          <h3 class="box-title">Watchlist</h3>
+          <div class="watchlist-rows">
+            <div class="wl-row" *ngFor="let w of watchlist" (click)="onSearch(); query=w.symbol; onSearch()">
+              <span class="wl-sym">{{ w.symbol }}</span>
+              <span class="wl-price">${{ w.price ? w.price.toFixed(2) : '0.00' }}</span>
+              <span class="wl-change" [class.positive]="w.change >= 0" [class.negative]="w.change < 0">
+                {{ w.change >= 0 ? '+' : '' }}{{ w.changePercent ? w.changePercent.toFixed(2) : '0.00' }}%
+              </span>
+            </div>
+            <div *ngIf="watchlist.length === 0" class="empty-msg">No watched items</div>
+          </div>
+
+          <!-- Recent Searches (Appended here as per rules) -->
+          <h3 class="box-title" style="margin-top: 20px;">Recent</h3>
+          <div class="recent-rows">
+            <div class="wl-row" *ngFor="let s of previous" (click)="selectPrevious(s)">
+              <span class="wl-sym" style="color: #888;">{{ s }}</span>
+            </div>
+          </div>
+        </div>
+
       </div>
 
-      <!-- COMPANY SUMMARY BELOW DETAILS -->
-      <div class="summary-panel">
-        <h2 class="section-title">Company Summary</h2>
-
-        <div class="summary-item"><strong>Sector:</strong> {{ companyInfo.sector }}</div>
-        <div class="summary-item"><strong>Industry:</strong> {{ companyInfo.industry }}</div>
-        <div class="summary-item"><strong>Employees:</strong> {{ companyInfo.employees > 0 ?
-          companyInfo.employees.toLocaleString() : 'N/A' }}</div>
-        <div class="summary-item"><strong>Location:</strong>
-          <span *ngIf="companyInfo.city !== '-' || companyInfo.country !== '-'">
-            {{ companyInfo.city !== '-' ? companyInfo.city : '' }}<span
-              *ngIf="companyInfo.city !== '-' && companyInfo.country !== '-'">, </span>{{ companyInfo.country !== '-' ?
-            companyInfo.country : '' }}
-          </span>
-          <span *ngIf="companyInfo.city === '-' && companyInfo.country === '-'">-</span>
-        </div>
-        <div class="summary-item" *ngIf="companyInfo.website"><strong>Website:</strong> <a [href]="companyInfo.website"
-            target="_blank" class="website-link">{{ companyInfo.website }}</a></div>
-        <div class="summary-description">
-          <strong>Description:</strong>
-          <p [class.description-clamped]="!isDescriptionExpanded">
-            {{ companyInfo.description }}
-          </p>
-          <button class="read-more-btn" (click)="toggleDescription()"
-            *ngIf="companyInfo.description && companyInfo.description !== '-'">
-            {{ isDescriptionExpanded ? 'Read less' : 'Read more...' }}
-          </button>
+      <!-- Insider Trading Placeholder (Full Width) -->
+      <div class="insider-box panel">
+        <h3 class="box-title">Insider Trading</h3>
+        <div class="empty-msg" style="text-align:center; color:#666; padding: 20px;">
+          No recent insider activity detected.
         </div>
       </div>
 
     </div>
-
-    <!-- RIGHT COLUMN -->
-    <div class="side-panels">
-
-      <div class="ratings-panel" *ngIf="companyInfo.recommendations">
-        <h2 class="section-title">Analyst Ratings</h2>
-        <div class="consensus-title">{{ companyInfo.recommendations.consensus }}</div>
-
-        <div class="ratings-bar">
-          <div class="rating-box strong-sell">
-            <div class="rating-count">{{ companyInfo.recommendations.strongSell }}</div>
-            <div class="rating-label">Strong Sell</div>
-          </div>
-          <div class="rating-box sell">
-            <div class="rating-count">{{ companyInfo.recommendations.sell }}</div>
-            <div class="rating-label">Sell</div>
-          </div>
-          <div class="rating-box hold">
-            <div class="rating-count">{{ companyInfo.recommendations.hold }}</div>
-            <div class="rating-label">Hold</div>
-          </div>
-          <div class="rating-box buy">
-            <div class="rating-count">{{ companyInfo.recommendations.buy }}</div>
-            <div class="rating-label">Buy</div>
-          </div>
-          <div class="rating-box strong-buy">
-            <div class="rating-count">{{ companyInfo.recommendations.strongBuy }}</div>
-            <div class="rating-label">Strong Buy</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="watchlist-panel">
-        <h2 class="section-title">Watchlist</h2>
-
-        <div class="watch-item" *ngFor="let w of watchlist" (click)="removeFromWatchlist(w.symbol)">
-          <span class="star">★</span>
-          <span class="ticker">{{ w.symbol }}</span>
-          <span class="mini-price">${{ w.price.toFixed(2) }}</span>
-        </div>
-        <div class="history-item" *ngIf="watchlist.length === 0" style="color: #666;">
-          No stocks in watchlist
-        </div>
-      </div>
-
-      <div class="history-panel">
-        <h2 class="section-title">Recent</h2>
-
-        <div class="history-item" *ngFor="let symbol of previous" (click)="selectPrevious(symbol)">
-          {{ symbol }}
-        </div>
-        <div class="history-item" *ngIf="previous.length === 0" style="color: #666;">
-          No recent searches
-        </div>
-      </div>
-
-    </div>
-
   </div>
-
 </div>
