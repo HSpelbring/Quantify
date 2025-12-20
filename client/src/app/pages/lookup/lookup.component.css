@@ -365,6 +365,12 @@
   color: #aaa;
 }
 
+.indicator-btn.active {
+  background: #333;
+  color: #4caf50;
+  border: 1px solid #4caf50;
+}
+
 
 .tf-btn {
   background: transparent;
@@ -391,6 +397,13 @@
 .graph-dynamic-change {
   font-size: 16px;
   font-weight: bold;
+}
+
+.graph-dynamic-change.bordered {
+  border: 1px solid #333;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: #111;
 }
 
 .chart-wrapper {

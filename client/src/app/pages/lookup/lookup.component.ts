@@ -103,7 +103,7 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
   loadWatchlistData() {
     this.watchlist = [];
     this.watchlistSymbols.forEach(sym => {
-      this.fundService.getStockDetails(sym).subscribe({
+      this.fundService.getFundSimple(sym).subscribe({
         next: (data) => {
           if (!data || data.error) return;
           // Add to watchlist array
@@ -187,6 +187,7 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.query.trim()) return;
 
     const symbol = this.query.toUpperCase();
+    localStorage.setItem('lastViewedSymbol', symbol);
 
     // Remove symbol if it already exists (to avoid duplicates)
     const existingIndex = this.previous.indexOf(symbol);
@@ -336,8 +337,11 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   changeTimeframe(tf: string) {
+    // Always reload, even if same timeframe (allows refresh)
     this.activeTF = tf;
+    this.cachedHistoryData = []; // Clear cache so we don't render stale data while loading
     if (this.details.symbol && this.details.symbol !== '-') {
+      this.loading = true; // Show loading spinner or similar if needed? User didn't ask for spinner on graph but implied data "doesn't load".
       this.loadHistory(this.details.symbol, tf);
     }
   }
@@ -347,6 +351,7 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
       next: (data) => {
         if (data.error) {
           console.error('Error loading history:', data.error);
+          this.loading = false; // Stop spinner
           return;
         }
         // Update chart with historical data
@@ -366,9 +371,13 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
             this.periodChangePercent = 0;
           }
         }
+
+        // Always stop loading, whether data exists or not
+        this.loading = false;
       },
       error: (err) => {
         console.error('Error fetching history:', err);
+        this.loading = false; // Stop spinner on error
       }
     });
   }
@@ -535,14 +544,50 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   destroyChart() {
+    // 1. Destroy via class reference
     if (this.chart) {
       this.chart.destroy();
       this.chart = null;
     }
+
+    // 2. Safety Check: Destroy via DOM element (Chart.js registry)
+    // This catches cases where this.chart might be null but a chart still exists on the canvas
+    if (this.chartCanvas && this.chartCanvas.nativeElement) {
+      const existingChart = Chart.getChart(this.chartCanvas.nativeElement);
+      if (existingChart) {
+        existingChart.destroy();
+      }
+    }
+  }
+
+  selectedIndicators: Set<string> = new Set();
+  cachedHistoryData: any[] = []; // Store data to re-render without refetching
+
+  toggleIndicator(ind: string) {
+    if (this.selectedIndicators.has(ind)) {
+      this.selectedIndicators.delete(ind);
+    } else {
+      this.selectedIndicators.add(ind);
+    }
+    this.updateChart(this.cachedHistoryData);
+  }
+
+  isIndicatorActive(ind: string): boolean {
+    return this.selectedIndicators.has(ind);
   }
 
   updateChart(historyData: any[]) {
-    if (!historyData || historyData.length === 0) return;
+    // Error handling: if no data, don't break, just clear or return
+    if (!historyData || historyData.length === 0) {
+      if (this.chart) {
+        this.chart.data.labels = [];
+        this.chart.data.datasets = [];
+        this.chart.update();
+      }
+      return;
+    }
+
+    this.cachedHistoryData = historyData;
 
     const labels = historyData.map(d => {
       const date = new Date(d.date);
@@ -557,12 +602,104 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const prices = historyData.map(d => d.close);
 
+    // Main Dataset
+    const datasets: any[] = [{
+      label: 'Price',
+      data: prices,
+      borderColor: '#4caf50',
+      backgroundColor: 'rgba(76, 175, 80, 0.1)',
+      borderWidth: 2,
+      fill: true,
+      tension: 0.1,
+      pointRadius: 0,
+      pointHoverRadius: 4
+    }];
+
+    // Indicators
+    const mapIndicator = (arr: any[], key: string) => arr.map(d => (d[key] !== undefined && d[key] !== null) ? d[key] : null);
+
+    if (this.selectedIndicators.has('50MA')) {
+      datasets.push({
+        label: '50 MA',
+        data: mapIndicator(historyData, 'sma50'),
+        borderColor: '#2196F3',
+        borderWidth: 1.5,
+        fill: false,
+        pointRadius: 0,
+        tension: 0.1
+      });
+    }
+
+    if (this.selectedIndicators.has('200MA')) {
+      datasets.push({
+        label: '200 MA',
+        data: mapIndicator(historyData, 'sma200'),
+        borderColor: '#FF9800',
+        borderWidth: 1.5,
+        fill: false,
+        pointRadius: 0,
+        tension: 0.1
+      });
+    }
+
+    if (this.selectedIndicators.has('VWAP')) {
+      datasets.push({
+        label: 'VWAP',
+        data: mapIndicator(historyData, 'vwap'),
+        borderColor: '#9C27B0',
+        borderWidth: 1.5,
+        fill: false,
+        pointRadius: 0,
+        tension: 0.1
+      });
+    }
+
+    // "Different Method": Update existing instance smoothness
     if (this.chart) {
       this.chart.data.labels = labels;
-      this.chart.data.datasets[0].data = prices;
-      this.chart.update();
+      this.chart.data.datasets = datasets;
+      this.chart.update(); // Standard update, no flicker
     } else {
-      this.initializeChart(labels, prices);
+      // Init only if needed
+      if (!this.chartCanvas) return;
+      const ctx = this.chartCanvas.nativeElement.getContext('2d');
+      if (!ctx) return;
+
+      this.chart = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: true, labels: { color: '#ccc' } },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+              backgroundColor: 'rgba(0, 0, 0, 0.8)',
+              titleColor: '#fff',
+              bodyColor: '#fff',
+              borderColor: '#4caf50',
+              borderWidth: 1
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: '#333', display: true },
+              ticks: { color: '#ccc', maxTicksLimit: 8 }
+            },
+            y: {
+              grid: { color: '#333', display: true },
+              ticks: { color: '#ccc' }
+            }
+          },
+          interaction: {
+            mode: 'nearest',
+            axis: 'x',
+            intersect: false
+          }
+        }
+      });
     }
   }
 
@@ -586,7 +723,8 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
       this.searchResults = results;
     });
 
-    this.query = 'AAPL';
+    const savedSymbol = localStorage.getItem('lastViewedSymbol');
+    this.query = savedSymbol ? savedSymbol : 'NVDA';
     this.onSearch();
   }
 

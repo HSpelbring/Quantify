@@ -44,6 +44,15 @@ export class FundService {
     );
   }
 
+  getFundSimple(symbol: string): Observable<any> {
+    return this.http.get(`/api/fund/${symbol}`).pipe(
+      catchError(err => {
+        console.error('Fund simple fetch error:', err);
+        return of({ error: 'Failed to fetch fund' });
+      })
+    );
+  }
+
   getStockHistory(symbol: string, range: string = '1M'): Observable<any> {
     return this.http.get(`/api/history/${symbol}?range=${range}`).pipe(
       catchError(err => {
@@ -63,11 +72,20 @@ export class FundService {
   }
 
   getNews(symbols: string[] = []): Observable<any[]> {
-    const query = symbols.join(',');
-    return this.http.get<any[]>(`/api/news?symbols=${query}`).pipe(
+    // Backend now ignores symbols and serves from DB cache
+    return this.http.get<any[]>('/api/news').pipe(
       catchError(err => {
         console.error('News fetch error:', err);
         return of([]);
+      })
+    );
+  }
+
+  refreshNews(): Observable<any> {
+    return this.http.post('/api/news/refresh', {}).pipe(
+      catchError(err => {
+        console.error('News refresh error:', err);
+        return of({ error: 'Failed to refresh' });
       })
     );
   }

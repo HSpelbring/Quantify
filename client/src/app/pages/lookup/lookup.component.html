@@ -94,11 +94,13 @@
 
               <div class="tf-divider"></div>
 
-              <button *ngFor="let ind of indicators" class="tf-btn indicator-btn">
+              <button *ngFor="let ind of indicators" class="tf-btn indicator-btn"
+                [class.active]="isIndicatorActive(ind)" (click)="toggleIndicator(ind)">
                 {{ ind }}
               </button>
             </div>
-            <div class="graph-dynamic-change" [class.positive]="periodChange >= 0" [class.negative]="periodChange < 0">
+            <div class="graph-dynamic-change bordered" [class.positive]="periodChange >= 0"
+              [class.negative]="periodChange < 0">
               {{ periodChange >= 0 ? '+' : '' }}{{ periodChangePercent.toFixed(2) }}%
             </div>
           </div>

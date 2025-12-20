@@ -728,31 +728,10 @@ def get_stock_details(symbol: str):
     Fetch comprehensive stock details for a given symbol.
     Returns all data needed for the lookup page.
     """
-    # CACHE CHECK (5-minute TTL for stock details)
-    global STOCK_DETAILS_CACHE
-    if 'STOCK_DETAILS_CACHE' not in globals():
-        STOCK_DETAILS_CACHE = {}
-    
-    cache_key = symbol.upper()
-    now = time.time()
-    
-    if cache_key in STOCK_DETAILS_CACHE:
-        entry = STOCK_DETAILS_CACHE[cache_key]
-        if now - entry['time'] < 300:  # 5 minutes
-            print(f"[{symbol}] Serving stock details from cache")
-            return entry['data']
-    
-    # FETCH (if not cached)
-    print(f"[{symbol}] Fetching fresh stock details...")
-    t0 = time.time()
-    
     try:
         ticker = yf.Ticker(symbol)
         info = ticker.info
         hist = ticker.history(period="1d")
-        
-        t1 = time.time()
-        print(f"[{symbol}] yfinance fetch took {t1-t0:.2f}s")
         
         # Get today's data if available
         today_high = info.get("dayHigh", 0)
@@ -765,7 +744,7 @@ def get_stock_details(symbol: str):
             today_low = float(hist["Low"].iloc[-1]) if not hist.empty else 0
             today_open = float(hist["Open"].iloc[-1]) if not hist.empty else 0
         
-        result = {
+        return {
             "symbol": symbol.upper(),
             "name": info.get("longName", symbol),
             "price": info.get("currentPrice") or info.get("regularMarketPrice", 0),
@@ -809,11 +788,6 @@ def get_stock_details(symbol: str):
             "earningsSurprise": get_earnings_surprise(ticker),
             "nextEarningsDate": get_next_earnings(ticker)
         }
-        
-        # Update cache
-        STOCK_DETAILS_CACHE[cache_key] = {'time': now, 'data': result}
-        return result
-        
     except Exception as e:
         print(f"Error fetching stock details for {symbol}: {e}")
         traceback.print_exc()
@@ -934,53 +908,6 @@ def get_earnings_surprise(ticker):
     except Exception:
         return None
 
-@app.get("/insider/{symbol}")
-def get_insider_trading(symbol: str):
-    """
-    Fetch insider trading data for a stock.
-    Returns recent buy/sell transactions by company insiders.
-    """
-    try:
-        print(f"[{symbol}] Fetching insider trading data...")
-        t0 = time.time()
-        
-        ticker = yf.Ticker(symbol)
-        insider_transactions = ticker.insider_transactions
-        
-        if insider_transactions is None or insider_transactions.empty:
-            print(f"[{symbol}] No insider trading data available")
-            return {"symbol": symbol.upper(), "transactions": []}
-        
-        # Take most recent 15 transactions
-        recent = insider_transactions.head(15)
-        transactions = []
-        
-        for idx, row in recent.iterrows():
-            # Safely extract date
-            date_val = row.get("Start Date", idx)
-            date_str = date_val.strftime("%Y-%m-%d") if hasattr(date_val, "strftime") else str(date_val)
-            
-            # Determine transaction type
-            trans_type = str(row.get("Transaction", "")).upper()
-            is_sale = any(x in trans_type for x in ["SALE", "SOLD", "S"])
-            
-            transactions.append({
-                "date": date_str,
-                "insider": str(row.get("Insider Trading", "Unknown")),
-                "title": str(row.get("Title", "N/A")),
-                "transactionType": "Sale" if is_sale else "Purchase",
-                "shares": int(row.get("Shares", 0)) if pd.notnull(row.get("Shares")) else 0,
-                "price": round(float(row.get("Value", 0)), 2) if pd.notnull(row.get("Value")) else 0
-            })
-        
-        t1 = time.time()
-        print(f"[{symbol}] Insider data: {len(transactions)} transactions in {t1-t0:.2f}s")
-        return {"symbol": symbol.upper(), "transactions": transactions}
-        
-    except Exception as e:
-        print(f"Error fetching insider data for {symbol}: {e}")
-        return {"symbol": symbol.upper(), "transactions": [], "error": str(e)}
-
 @app.get("/history/{symbol}")
 def get_stock_history(symbol: str, range: str = "1mo"):
     """
@@ -998,7 +925,7 @@ def get_stock_history(symbol: str, range: str = "1mo"):
     if cache_key in HISTORY_CACHE:
         entry = HISTORY_CACHE[cache_key]
         if now - entry['time'] < 60: # 60s cache
-            print(f"[{symbol}] Serving {range} from cache")
+            print(f"[{symbol}] Serving {tf} from cache")
             return entry['payload']
 
     try:
@@ -1119,9 +1046,8 @@ def get_stock_history(symbol: str, range: str = "1mo"):
         # Rename to lowercase keys
         output_df.columns = ["date", "open", "high", "low", "close", "volume", "sma50", "sma200", "vwap"]
         
-        # Convert to list of dicts (using pandas JSON encoder to handle numpy types)
-        import json
-        data = json.loads(output_df.to_json(orient="records"))
+        # Convert to list of dicts
+        data = output_df.to_dict(orient="records")
         t3 = time.time()
         print(f"[{symbol}] Processing took {t3-t2:.2f}s")
         
@@ -1135,17 +1061,8 @@ def get_stock_history(symbol: str, range: str = "1mo"):
         HISTORY_CACHE[cache_key] = {'time': now, 'payload': resp}
         return resp
     except Exception as e:
-        err_msg = f"Error fetching history for {symbol}: {e}"
-        print(err_msg)
+        print(f"Error fetching history for {symbol}: {e}")
         traceback.print_exc()
-        try:
-            with open("error_log.txt", "a") as f:
-                f.write(f"\n--- ERROR {datetime.now()} ---\n")
-                f.write(err_msg + "\n")
-                f.write(traceback.format_exc())
-                f.write("--------------------------\n")
-        except:
-            pass
         return {
             "error": str(e),
             "symbol": symbol.upper()

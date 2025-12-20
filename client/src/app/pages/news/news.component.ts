@@ -5,10 +5,16 @@ import { FundService } from '../../services/fund.service';
 
 export type TagCategory =
     | 'Stock'       // Blue
+    | 'Fund'        // Light Blue
+    | 'Crypto'      // Orange/Gold (New)
     | 'Sector'      // Purple
     | 'Negative'    // Red
     | 'Positive'    // Green
-    | 'Corporate'   // Orange
+    | 'Merger'      // Indigo
+    | 'Dividend'    // Teal
+    | 'Management'  // Orange
+    | 'Guidance'    // Pink
+    | 'Corporate'   // (Legacy/Fallback)
     | 'Analyst'     // Yellow
     | 'Legal';      // Dark Red
 
@@ -26,6 +32,7 @@ export interface Article {
     sentimentScore: number;
     sentimentLabel?: string; // e.g. "Highly Positive"
     tags: NewsTag[];
+    link: string;
 }
 
 @Component({
@@ -43,12 +50,15 @@ export class NewsComponent implements OnInit {
 
     // Filter State
     selectedCategories: Set<TagCategory> = new Set();
+    sortOption: 'recent' | 'bullish' | 'bearish' = 'recent';
 
     // Available filters (extracted from data or hardcoded)
     filterGroups = [
-        { name: 'Market Data', categories: ['Stock', 'Sector'] as TagCategory[] },
-        { name: 'Events', categories: ['Positive', 'Negative', 'Corporate'] as TagCategory[] },
-        { name: 'Analysis & Legal', categories: ['Analyst', 'Legal'] as TagCategory[] },
+        { name: 'Asset Class', categories: ['Stock', 'Fund', 'Crypto'] as TagCategory[] },
+        { name: 'Corporate Events', categories: ['Merger', 'Dividend', 'Management', 'Guidance'] as TagCategory[] },
+        { name: 'Market Sentiment', categories: ['Positive', 'Negative', 'Analyst'] as TagCategory[] },
+        { name: 'Sectors & Macro', categories: ['Sector'] as TagCategory[] }, // We could split sectors if needed
+        { name: 'Legal', categories: ['Legal'] as TagCategory[] }
     ];
 
     constructor(private fundService: FundService) { }
@@ -59,31 +69,25 @@ export class NewsComponent implements OnInit {
 
     loadRealNews() {
         this.loading = true;
-        // 1. Get User's Symbols from Portfolio
-        const saved = localStorage.getItem('quantify_portfolio');
-        let symbols: string[] = [];
 
-        if (saved) {
-            try {
-                const data = JSON.parse(saved);
-                if (data.holdings) {
-                    symbols = data.holdings.map((h: any) => h.symbol);
-                }
-            } catch (e) {
-                console.error("Error parsing portfolio for news", e);
-            }
-        }
-
-        // If portfolio empty, default to big tech for demo
-        if (symbols.length === 0) {
-            symbols = ["AAPL", "NVDA", "TSLA", "MSFT", "AMD"];
-        }
-
-        // 2. Fetch News
-        this.fundService.getNews(symbols).subscribe(data => {
+        // 1. Load Cached News Instantly
+        this.fundService.getNews().subscribe(data => {
             this.articles = data;
             this.applyFilters();
-            this.loading = false;
+            this.loading = false; // Show content immediately
+
+            // 2. Trigger Background Refresh (ETL Pipeline)
+            console.log("Triggering background news refresh...");
+            this.fundService.refreshNews().subscribe(resp => {
+                console.log("News refreshed:", resp);
+                if (resp.status === 'refreshed' && resp.count > 0) {
+                    // if new articles found, reload the feed quietly
+                    this.fundService.getNews().subscribe(newData => {
+                        this.articles = newData;
+                        this.applyFilters();
+                    });
+                }
+            });
         });
     }
 
@@ -111,15 +115,29 @@ export class NewsComponent implements OnInit {
     // Let's implement OR logic for the sidebar categories (Show Positive OR Corporate).
     // AND logic applies if multiple distinct *tag* filters were selected (e.g. text search + cat), but here we just have category toggles for now.
     applyFilters() {
-        if (this.selectedCategories.size === 0) {
-            this.filteredArticles = this.articles;
-            return;
+        // 1. Filter
+        let result = this.articles;
+
+        if (this.selectedCategories.size > 0) {
+            result = result.filter(article => {
+                // Check if article has AT LEAST ONE tag in the selected categories
+                return article.tags.some(tag => this.selectedCategories.has(tag.category));
+            });
         }
 
-        this.filteredArticles = this.articles.filter(article => {
-            // Check if article has AT LEAST ONE tag in the selected categories
-            return article.tags.some(tag => this.selectedCategories.has(tag.category));
-        });
+        // 2. Sort
+        if (this.sortOption === 'recent') {
+            // Already sorted by backend usually, but re-sort to be safe
+            result.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        } else if (this.sortOption === 'bullish') {
+            // High score first
+            result.sort((a, b) => b.sentimentScore - a.sentimentScore);
+        } else if (this.sortOption === 'bearish') {
+            // Low score first
+            result.sort((a, b) => a.sentimentScore - b.sentimentScore);
+        }
+
+        this.filteredArticles = [...result]; // New reference
     }
 
     getSentimentColor(score: number): string {

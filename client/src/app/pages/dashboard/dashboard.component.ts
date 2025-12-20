@@ -74,7 +74,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
               tension: 0.3,
             },
             {
-              data: Array(fund.history.length).fill(fund.open),
+              data: Array((fund.history || []).length).fill(fund.open),
               borderColor: '#888888',
               borderWidth: 1,
               pointRadius: 0,

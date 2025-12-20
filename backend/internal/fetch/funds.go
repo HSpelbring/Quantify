@@ -31,18 +31,24 @@ func FetchFunds() ([]models.Fund, error) {
 	// Otherwise fetch fresh data
 	result := []models.Fund{}
 
+	// Bulk Fetch from Python (1 call)
+	bulkData, err := FetchYahooBulk()
+
 	for _, t := range tracked {
 		sym := t.Symbol
 
-		// Try full robust FetchFund() logic
-		f, err := FetchFund(sym)
-		if err == nil && f.Price > 0 {
-			f.Name = t.Name
-			result = append(result, f)
-			continue
+		// 1. Try Bulk Data
+		if err == nil {
+			if f, found := bulkData[sym]; found && f.Price > 0 {
+				f.Name = t.Name
+				// Ensure symbol matches our tracked list
+				f.Symbol = sym
+				result = append(result, f)
+				continue
+			}
 		}
 
-		// Fallback to previous cached item (if exists)
+		// 2. Fallback to Cache
 		if ok {
 			for _, old := range cached {
 				if old.Symbol == sym {
@@ -52,7 +58,7 @@ func FetchFunds() ([]models.Fund, error) {
 			}
 		}
 
-		// Last resort: placeholder
+		// 3. Fallback to Zero
 		result = append(result, models.Fund{
 			Symbol: sym,
 			Name:   t.Name,

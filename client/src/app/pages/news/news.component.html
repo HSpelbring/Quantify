@@ -23,9 +23,18 @@
     <!-- MAIN CONTENT -->
     <main class="news-feed">
         <header class="feed-header">
-            <h1>Latest Market Intelligence</h1>
-            <div class="live-indicator">
-                <span class="dot"></span> Live Scan
+            <div class="header-left">
+                <h1>Latest Market Intelligence</h1>
+                <div class="live-indicator">
+                    <span class="dot"></span> Live Scan
+                </div>
+            </div>
+            <div class="header-right">
+                <select [(ngModel)]="sortOption" (change)="applyFilters()" class="sort-select">
+                    <option value="recent">Most Recent</option>
+                    <option value="bullish">Most Bullish</option>
+                    <option value="bearish">Most Bearish</option>
+                </select>
             </div>
         </header>
 
@@ -38,13 +47,15 @@
                 <!-- CENTER: Content -->
                 <div class="article-content">
                     <div class="article-header">
-                        <h3 class="article-title">{{ article.title }}</h3>
+                        <h3 class="article-title">
+                            <a [href]="article.link" target="_blank">{{ article.title }}</a>
+                        </h3>
                         <span class="article-source">{{ article.source }} • {{ article.timestamp | date:'shortTime' }} •
                             {{ article.timestamp | date:'longDate' }}</span>
                     </div>
 
                     <div class="article-tags">
-                        <span *ngFor="let tag of article.tags" class="tag" [attr.data-cat]="tag.category">
+                        <span *ngFor="let tag of article.tags.slice(0, 5)" class="tag" [attr.data-cat]="tag.category">
                             {{ tag.label }}
                         </span>
                     </div>

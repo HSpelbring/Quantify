@@ -7,18 +7,20 @@ import (
 	"net/http"
 )
 
-// Define QuoteResponse so we can parse Python's JSON structure
-type QuoteResponse struct {
-	Price   float64   `json:"price"`
-	Change  float64   `json:"change"`
-	Open    float64   `json:"open"`
-	History []float64 `json:"history"`
+type PriceResponse struct {
+	Symbol        string  `json:"symbol"`
+	Price         float64 `json:"price"`
+	Change        float64 `json:"change"`
+	ChangePercent float64 `json:"changePercent"`
 }
 
 func FetchYahoo(symbol string) (models.Fund, error) {
 	var f models.Fund
 
-	// Map ETF → Index
+	// Map ETF → Index (if needed for legacy reasons, but /price/ endpoint handles tickers directly)
+	// If symbol is SPY, we might want ^GSPC data?
+	// Usually users want the ETF price if they search SPY.
+	// But let's check existing mapping:
 	indexMap := map[string]string{
 		"SPY": "^GSPC",
 		"QQQ": "^NDX",
@@ -31,31 +33,68 @@ func FetchYahoo(symbol string) (models.Fund, error) {
 		lookup = mapped
 	}
 
-	// log.Printf("[FetchYahoo] Fetching quotes from Python...")
-	resp, err := http.Get("http://localhost:8000/quotes")
+	// Call Python lightweight endpoint
+	url := fmt.Sprintf("http://localhost:8000/price/%s", lookup)
+	resp, err := http.Get(url)
 	if err != nil {
 		return f, err
 	}
 	defer resp.Body.Close()
 
-	// NEW STRUCT FOR PARSING PYTHON
-	var quotes map[string]QuoteResponse
+	if resp.StatusCode != http.StatusOK {
+		return f, fmt.Errorf("python service returned status: %d", resp.StatusCode)
+	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&quotes); err != nil {
+	var pr PriceResponse
+	if err := json.NewDecoder(resp.Body).Decode(&pr); err != nil {
 		return f, fmt.Errorf("decode: %v", err)
 	}
 
-	// Match the index or ETF symbol
-	if q, ok := quotes[lookup]; ok {
-		// log.Printf("[FetchYahoo] Found %s (price=%.2f, history=%d points)", lookup, q.Price, len(q.History))
-		f.Symbol = symbol
-		f.Price = q.Price
-		f.Change = q.Change
-		f.Open = q.Open
-		f.History = q.History
-	} else {
-		// log.Printf("[FetchYahoo] Symbol %s not found in quotes response", lookup)
+	// Map to Fund
+	f.Symbol = symbol
+	f.Price = pr.Price
+	f.Change = pr.Change
+	f.ChangePercent = pr.ChangePercent
+	// f.History is not returned by /price, which is fine for lightweight fetch
+
+	// If we got valid data, success
+	if f.Price != 0 {
+		return f, nil
 	}
 
-	return f, nil
+	return f, fmt.Errorf("zero price returned")
+}
+
+// Full structure for Dashboard (includes history)
+type QuoteResponse struct {
+	Price   float64   `json:"price"`
+	Change  float64   `json:"change"`
+	Open    float64   `json:"open"`
+	History []float64 `json:"history"`
+}
+
+func FetchYahooBulk() (map[string]models.Fund, error) {
+	results := make(map[string]models.Fund)
+
+	resp, err := http.Get("http://localhost:8000/quotes")
+	if err != nil {
+		return results, err
+	}
+	defer resp.Body.Close()
+
+	var quotes map[string]QuoteResponse
+	if err := json.NewDecoder(resp.Body).Decode(&quotes); err != nil {
+		return results, fmt.Errorf("decode: %v", err)
+	}
+
+	for key, q := range quotes {
+		results[key] = models.Fund{
+			Symbol:  key,
+			Price:   q.Price,
+			Change:  q.Change,
+			Open:    q.Open,
+			History: q.History,
+		}
+	}
+	return results, nil
 }

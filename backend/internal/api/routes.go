@@ -116,11 +116,22 @@ func RegisterRoutes(router *gin.Engine) {
 			c.DataFromReader(http.StatusOK, resp.ContentLength, "application/json", resp.Body, nil)
 		})
 
-		//  Real News (Fetch + Save)
+		//  Real News (Cache First)
 		r.GET("/news", func(c *gin.Context) {
-			symbols := c.Query("symbols")
+			// Serve from DB instant load
+			articles, err := db.GetRecentArticles(60)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, articles)
+		})
 
-			resp, err := http.Get("http://localhost:8000/news?symbols=" + symbols)
+		//  Refresh News (Trigger Pipeline)
+		r.POST("/news/refresh", func(c *gin.Context) {
+			// Trigger Python service to fetch fresh market data
+			// We don't pass symbols anymore, relying on Python's default "Market Pulse" list
+			resp, err := http.Get("http://localhost:8000/news")
 			if err != nil {
 				log.Println("Error contacting Python service for news:", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -135,21 +146,19 @@ func RegisterRoutes(router *gin.Engine) {
 				return
 			}
 
-			// Parse to save
+			// Parse and Save
 			var articles []db.Article
 			if err := json.Unmarshal(body, &articles); err == nil {
-				// Async save to not block UI
-				go func() {
-					if err := db.SaveArticles(articles); err != nil {
-						log.Printf("Failed to save articles: %v", err)
-					}
-				}()
+				if err := db.SaveArticles(articles); err != nil {
+					log.Printf("Failed to save articles: %v", err)
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save to DB"})
+					return
+				}
+				c.JSON(http.StatusOK, gin.H{"status": "refreshed", "count": len(articles)})
 			} else {
 				log.Printf("Failed to unmarshal news for saving: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid news data"})
 			}
-
-			// Return original JSON to client
-			c.Data(http.StatusOK, "application/json", body)
 		})
 
 		//  Search News (Historical)

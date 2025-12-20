@@ -30,7 +30,12 @@ func SaveArticles(articles []Article) error {
 	stmt, err := tx.Prepare(`
 		INSERT INTO news_articles (id, title, source, url, published_at, sentiment_score, sentiment_label, tags)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(id) DO NOTHING
+		ON CONFLICT(id) DO UPDATE SET
+			tags = excluded.tags,
+			sentiment_score = excluded.sentiment_score,
+			sentiment_label = excluded.sentiment_label,
+			title = excluded.title, -- Update title in case of typos fixed upstream
+			url = excluded.url
 	`)
 	if err != nil {
 		return err
@@ -52,7 +57,7 @@ func SaveArticles(articles []Article) error {
 			string(tagsJSON),
 		)
 		if err != nil {
-			log.Printf("Error inserting article %s: %v", a.Title, err)
+			log.Printf("Error inserting/updating article %s: %v", a.Title, err)
 			continue
 		}
 	}
@@ -114,5 +119,46 @@ func SearchNews(query string, limit int) ([]Article, error) {
 		results = append(results, a)
 	}
 
+	return results, nil
+}
+
+// GetRecentArticles fetches the latest N articles from the DB
+func GetRecentArticles(limit int) ([]Article, error) {
+	rows, err := DB.Query(`
+		SELECT id, title, source, url, published_at, sentiment_score, sentiment_label, tags
+		FROM news_articles
+		ORDER BY published_at DESC
+		LIMIT ?
+	`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []Article
+	for rows.Next() {
+		var a Article
+		var tagsStr string
+		err := rows.Scan(
+			&a.ID,
+			&a.Title,
+			&a.Source,
+			&a.Link,
+			&a.Timestamp,
+			&a.SentimentScore,
+			&a.SentimentLabel,
+			&tagsStr,
+		)
+		if err != nil {
+			log.Println("Error scanning row:", err)
+			continue
+		}
+
+		// Unmarshal tags
+		if err := json.Unmarshal([]byte(tagsStr), &a.Tags); err != nil {
+			a.Tags = []interface{}{}
+		}
+		results = append(results, a)
+	}
 	return results, nil
 }
