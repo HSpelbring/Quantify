@@ -803,6 +803,7 @@ def get_stock_details(symbol: str):
             "city": info.get("city", "N/A"),
             # Analyst Recommendations
             "recommendations": get_analyst_ratings(ticker, info),
+            "targetMeanPrice": info.get("targetMeanPrice", 0),
             # Enhanced Events Data
             "splits": get_splits(ticker),
             "shareTrend": get_share_trend(ticker),
@@ -934,52 +935,273 @@ def get_earnings_surprise(ticker):
     except Exception:
         return None
 
-@app.get("/insider/{symbol}")
-def get_insider_trading(symbol: str):
+@app.get("/insider/ingest/{symbol}")
+def ingest_insider_trading(symbol: str):
     """
-    Fetch insider trading data for a stock.
-    Returns recent buy/sell transactions by company insiders.
+    Ingest insider trading data from SEC-API with caching and deduplication.
+    Only fetches new filings since the last stored filing date.
     """
     try:
-        print(f"[{symbol}] Fetching insider trading data...")
-        t0 = time.time()
+        print(f"\n{'='*60}")
+        print(f"INSIDER INGESTION: {symbol.upper()}")
+        print(f"{'='*60}")
         
-        ticker = yf.Ticker(symbol)
-        insider_transactions = ticker.insider_transactions
+        t_start = time.time()
         
-        if insider_transactions is None or insider_transactions.empty:
-            print(f"[{symbol}] No insider trading data available")
-            return {"symbol": symbol.upper(), "transactions": []}
+        # Get API key
+        api_key = os.getenv("SEC_API_KEY")
+        if not api_key:
+            return {"symbol": symbol.upper(), "error": "SEC_API_KEY not configured", "ingested": 0}
         
-        # Take most recent 15 transactions
-        recent = insider_transactions.head(15)
-        transactions = []
+        # Step 1: Check cache - get latest filing date from database
+        print(f"[Step 1] Checking database for existing trades...")
+        go_url = f"http://localhost:3000/api/insider/latest/{symbol.upper()}"
+        try:
+            resp = requests.get(go_url, timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
+                latest_filing_date = data.get("filingDate", "1970-01-01")
+                print(f"  → Latest filing date in DB: {latest_filing_date}")
+            else:
+                latest_filing_date = "1970-01-01"
+                print(f"  → No existing data, will fetch all")
+        except:
+            latest_filing_date = "1970-01-01"
+            print(f"  → Database check failed, will fetch all")
         
-        for idx, row in recent.iterrows():
-            # Safely extract date
-            date_val = row.get("Start Date", idx)
-            date_str = date_val.strftime("%Y-%m-%d") if hasattr(date_val, "strftime") else str(date_val)
-            
-            # Determine transaction type
-            trans_type = str(row.get("Transaction", "")).upper()
-            is_sale = any(x in trans_type for x in ["SALE", "SOLD", "S"])
-            
-            transactions.append({
-                "date": date_str,
-                "insider": str(row.get("Insider Trading", "Unknown")),
-                "title": str(row.get("Title", "N/A")),
-                "transactionType": "Sale" if is_sale else "Purchase",
-                "shares": int(row.get("Shares", 0)) if pd.notnull(row.get("Shares")) else 0,
-                "price": round(float(row.get("Value", 0)), 2) if pd.notnull(row.get("Value")) else 0
-            })
+        # Step 2: Query SEC-API for new filings
+        print(f"[Step 2] Querying SEC-API...")
+        from sec_api import InsiderTradingApi
+        api = InsiderTradingApi(api_key)
         
-        t1 = time.time()
-        print(f"[{symbol}] Insider data: {len(transactions)} transactions in {t1-t0:.2f}s")
-        return {"symbol": symbol.upper(), "transactions": transactions}
+        # Query with date filter (only fetch filings newer than latest)
+        trades_data = api.get_data({
+            "query": f"issuer.tradingSymbol:{symbol.upper()} AND filedAt:[{latest_filing_date} TO *]",
+            "from": "0",
+            "size": "100",  # Fetch up to 100 new transactions
+            "sort": [{"filedAt": {"order": "desc"}}]
+        })
+        
+        if not trades_data or "transactions" not in trades_data:
+            print(f"  → No new trades found")
+            return {"symbol": symbol.upper(), "ingested": 0, "message": "No new trades"}
+        
+        raw_transactions = trades_data["transactions"]
+        print(f"  → Found {len(raw_transactions)} transactions from SEC-API")
+        
+        # Step 3: Get company context (for derived metrics)
+        print(f"[Step 3] Fetching company context...")
+        ticker_obj = yf.Ticker(symbol.upper())
+        info = ticker_obj.info
+        shares_outstanding = info.get("sharesOutstanding", 0)
+        public_float = info.get("floatShares", shares_outstanding)
+        market_cap = info.get("marketCap", 0)
+        avg_volume = info.get("averageVolume", 0)
+        
+        # Step 4: Process and compute derived metrics
+        print(f"[Step 4] Processing transactions...")
+        ingested_count = 0
+        
+        for t in raw_transactions:
+            try:
+                # Extract core fields
+                owner = t.get("reportingOwner", {})
+                insider_name = owner.get("name", "Unknown")
+                insider_cik = owner.get("cik", "")
+                relationship = owner.get("relationshipToIssuer", "")
+                
+                # Parse relationship flags
+                is_officer = "officer" in relationship.lower() or "ceo" in relationship.lower()
+                is_director = "director" in relationship.lower()
+                is_ten_percent = "10%" in relationship or "owner" in relationship.lower()
+                
+                # Transaction details
+                acq_disp_code = t.get("transactionAcquiredDisposedCode", "")
+                transaction_type = "SELL" if acq_disp_code == "D" else "BUY"
+                trans_code = t.get("transactionCode", "")
+                shares_transacted = int(t.get("transactionShares", 0) or 0)
+                price_per_share = float(t.get("transactionPricePerShare", 0) or 0)
+                transaction_value = shares_transacted * price_per_share
+                
+                # Dates
+                trans_date_str = t.get("transactionDate", "")
+                filing_date_str = t.get("filedAt", "")[:10]
+                transaction_date = datetime.strptime(trans_date_str[:10], "%Y-%m-%d") if trans_date_str else datetime.now()
+                filing_date = datetime.strptime(filing_date_str, "%Y-%m-%d") if filing_date_str else datetime.now()
+                
+                # Ownership
+                shares_owned_after = int(t.get("postTransactionShares", 0) or 0)
+                shares_owned_before = shares_owned_after - shares_transacted if transaction_type == "BUY" else shares_owned_after + shares_transacted
+                ownership_change_pct = (shares_transacted / shares_owned_before * 100) if shares_owned_before > 0 else 0
+                ownership_pct_company = (shares_owned_after / shares_outstanding * 100) if shares_outstanding > 0 else 0
+                
+                # Company impact
+                float_impact_pct = (shares_transacted / public_float * 100) if public_float > 0 else 0
+                
+                # Classification
+                is_automatic = trans_code == "M" or "10b5-1" in str(t)
+                is_compensation = trans_code in ["A", "I", "G"]  # Award, In-Kind, Gift
+                is_discretionary = not is_automatic and not is_compensation and trans_code not in ["M", "G"]
+                
+                # Insider weight (based on title)
+                insider_title = owner.get("title", relationship)
+                weight = compute_insider_weight(insider_title, is_officer, is_director, is_ten_percent)
+                
+                # Conviction score
+                conviction = compute_conviction_score(
+                    transaction_type, is_discretionary, is_officer, is_director, 
+                    is_ten_percent, is_automatic, is_compensation,
+                    shares_transacted, avg_volume
+                )
+                
+                # Signal classification
+                signal_label, signal_reason = classify_signal(transaction_type, conviction, is_discretionary)
+                
+                # Confidence badge
+                confidence_badge = "High" if conviction >= 75 else "Medium" if conviction >= 50 else "Low"
+                
+                # Build trade object
+                trade = {
+                    "ticker": symbol.upper(),
+                    "companyName": info.get("longName", symbol),
+                    "companyCik": info.get("cik", ""),
+                    "exchange": info.get("exchange", ""),
+                    "industry": info.get("industry", ""),
+                    "insiderName": insider_name,
+                    "insiderCik": insider_cik,
+                    "insider Title": insider_title,
+                    "isOfficer": is_officer,
+                    "isDirector": is_director,
+                    "isTenPercentOwner": is_ten_percent,
+                    "relationshipSummary": relationship,
+                    "transactionType": transaction_type,
+                    "transactionCode": trans_code,
+                    "sharesTransacted": shares_transacted,
+                    "pricePerShare": round(price_per_share, 2),
+                    "transactionValue": round(transaction_value, 2),
+                    "transactionDate": transaction_date.isoformat(),
+                    "filingDate": filing_date.isoformat(),
+                    "sharesOwnedAfter": shares_owned_after,
+                    "ownershipChangePct": round(ownership_change_pct, 2),
+                    "ownershipPctCompany": round(ownership_pct_company, 4),
+                    "sharesOutstanding": shares_outstanding,
+                    "publicFloat": public_float,
+                    "floatImpactPct": round(float_impact_pct, 4),
+                    "marketCapAtTrade": market_cap,
+                    "avgDailyVolume": avg_volume,
+                    "isDiscretionary": is_discretionary,
+                    "isCompensationRelated": is_compensation,
+                    "isAutomaticTrade": is_automatic,
+                    "isFirstTimeBuy": False,  # Would need historical analysis
+                    "isClusterTrade": False,  # Would need clustering analysis
+                    "convictionScore": conviction,
+                    "insiderWeight": weight,
+                    "valueVsSalaryRatio": 0.0,  # Would need salary data
+                    "netInsiderFlow30d": 0.0,  # Would need historical aggregation
+                    "buySellRatio90d": 0.0,  # Would need historical aggregation
+                    "formType": t.get("formType", "Form 4"),
+                    "secFilingUrl": t.get("linkToFilingDetails", ""),
+                    "source": "SEC",
+                    "signalLabel": signal_label,
+                    "signalReason": signal_reason,
+                    "highlightFlag": conviction >= 80,
+                    "confidenceBadge": confidence_badge
+                }
+                
+                # Save to database via Go API
+                save_url = "http://localhost:3000/api/insider/save"
+                save_resp = requests.post(save_url, json=trade, timeout=5)
+                
+                if save_resp.status_code == 200:
+                    ingested_count += 1
+                    print(f"  ✓ Saved: {insider_name} - {transaction_type} {shares_transacted:,} shares")
+                
+            except Exception as e:
+                print(f"  ✗ Failed to process transaction: {e}")
+                continue
+        
+        t_end = time.time()
+        print(f"\n{'='*60}")
+        print(f"INGESTION COMPLETE: {ingested_count} new trades in {t_end-t_start:.2f}s")
+        print(f"{'='*60}\n")
+        
+        return {
+            "symbol": symbol.upper(),
+            "ingested": ingested_count,
+            "total_found": len(raw_transactions),
+            "time_seconds": round(t_end - t_start, 2)
+        }
         
     except Exception as e:
-        print(f"Error fetching insider data for {symbol}: {e}")
-        return {"symbol": symbol.upper(), "transactions": [], "error": str(e)}
+        print(f"[ERROR] Ingestion failed: {e}")
+        traceback.print_exc()
+        return {"symbol": symbol.upper(), "error": str(e), "ingested": 0}
+
+
+def compute_insider_weight(title: str, is_officer: bool, is_director: bool, is_ten_percent: bool) -> float:
+    """Calculate insider weight based on position"""
+    title_lower = title.lower()
+    
+    if "ceo" in title_lower or "chief executive" in title_lower:
+        return 1.0
+    elif "cfo" in title_lower or "chief financial" in title_lower:
+        return 0.9
+    elif "president" in title_lower:
+        return 0.9
+    elif is_ten_percent:
+        return 0.85
+    elif is_director:
+        return 0.7
+    elif is_officer:
+        return 0.6
+    else:
+        return 0.4
+
+
+def compute_conviction_score(trans_type: str, is_discretionary: bool, is_officer: bool, 
+                              is_director: bool, is_ten_percent: bool, is_automatic: bool,
+                              is_compensation: bool, shares: int, avg_volume: int) -> int:
+    """Calculate conviction score (0-100)"""
+    base_score = 50
+    
+    # Positive factors
+    if is_discretionary:
+        base_score += 20
+    if is_officer or is_director:
+        base_score += 15
+    if is_ten_percent:
+        base_score += 10
+    
+    # Negative factors
+    if is_automatic:
+        base_score -= 25
+    if is_compensation:
+        base_score -= 15
+    
+    # Volume impact
+    if avg_volume > 0:
+        volume_ratio = shares / avg_volume
+        volume_bonus = min(volume_ratio * 100, 20)
+        base_score += int(volume_bonus)
+    
+    # Clamp to 0-100
+    return max(0, min(100, base_score))
+
+
+def classify_signal(trans_type: str, conviction: int, is_discretionary: bool) -> tuple:
+    """Classify trade signal"""
+    if trans_type == "BUY":
+        if conviction >= 70:
+            reason = "High conviction buy" if is_discretionary else "Significant purchase"
+            return "Bullish", reason
+        else:
+            return "Neutral", "Routine purchase"
+    else:  # SELL
+        if conviction >= 70:
+            reason = "High conviction sell" if is_discretionary else "Significant sale"
+            return "Bearish", reason
+        else:
+            return "Neutral", "Routine sale"
 
 @app.get("/history/{symbol}")
 def get_stock_history(symbol: str, range: str = "1mo"):
@@ -1150,3 +1372,374 @@ def get_stock_history(symbol: str, range: str = "1mo"):
             "error": str(e),
             "symbol": symbol.upper()
         }
+
+
+# ========================================================================
+# SEC EDGAR INSIDER TRADING INTEGRATION
+# ========================================================================
+
+import xml.etree.ElementTree as ET
+from typing import List, Dict, Optional
+from datetime import datetime, timedelta
+
+# Ticker to CIK mapping cache
+CIK_CACHE = {}
+
+def get_cik_for_ticker(ticker: str) -> Optional[str]:
+    """
+    Convert ticker symbol to SEC CIK number.
+    Uses SEC company tickers JSON endpoint.
+    """
+    ticker = ticker.upper().strip()
+    
+    # Check cache first
+    if ticker in CIK_CACHE:
+        return CIK_CACHE[ticker]
+    
+    try:
+        # SEC provides a JSON mapping of all tickers to CIKs
+        url = "https://www.sec.gov/files/company_tickers.json"
+        headers = {
+            "User-Agent": "Quantify Platform contact@quantify.com"
+        }
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        # Search for ticker
+        for entry in data.values():
+            if entry.get("ticker", "").upper() == ticker:
+                cik = str(entry["cik_str"]).zfill(10)  # Pad to 10 digits
+                CIK_CACHE[ticker] = cik
+                return cik
+        
+        print(f"CIK not found for ticker: {ticker}")
+        return None
+        
+    except Exception as e:
+        print(f"Error fetching CIK for {ticker}: {e}")
+        return None
+
+
+def parse_sec_form4(xml_content: str) -> List[Dict]:
+    """
+    Parse SEC Form 4 XML to extract transaction details.
+    Returns list of transaction dictionaries.
+    """
+    transactions = []
+    
+    try:
+        root = ET.fromstring(xml_content)
+        
+        # Extract insider information
+        owner_data = root.find(".//reportingOwner")
+        if owner_data is None:
+            return []
+        
+        insider_name = ""
+        owner_name = owner_data.find(".//rptOwnerName")
+        if owner_name is not None:
+            insider_name = owner_name.text or "Unknown"
+        
+        # Get relationship info
+        relationship = owner_data.find(".//reportingOwnerRelationship")
+        is_director = relationship.find(".//isDirector").text == "1" if relationship is not None and relationship.find(".//isDirector") is not None else False
+        is_officer = relationship.find(".//isOfficer").text == "1" if relationship is not None and relationship.find(".//isOfficer") is not None else False
+        is_ten_percent = relationship.find(".//isTenPercentOwner").text == "1" if relationship is not None and relationship.find(".//isTenPercentOwner") is not None else False
+        is_other = relationship.find(".//isOther").text == "1" if relationship is not None and relationship.find(".//isOther") is not None else False
+        
+        officer_title = ""
+        title_elem = relationship.find(".//officerTitle") if relationship is not None else None
+        if title_elem is not None and title_elem.text:
+            officer_title = title_elem.text
+        
+        # Extract non-derivative transactions
+        for transaction in root.findall(".//nonDerivativeTransaction"):
+            try:
+                trans_data = {}
+                
+                # Transaction date
+                trans_date_elem = transaction.find(".//transactionDate/value")
+                trans_data["transactionDate"] = trans_date_elem.text if trans_date_elem is not None else ""
+                
+                # Transaction code (P=Purchase, S=Sale, etc.)
+                trans_code_elem = transaction.find(".//transactionCode")
+                trans_code = trans_code_elem.text if trans_code_elem is not None else "P"
+                trans_data["transactionCode"] = trans_code
+                
+                # Acquisition or Disposition (CRITICAL for determining BUY vs SELL)
+                acq_disp_elem = transaction.find(".//transactionAcquiredDisposedCode/value")
+                acq_disp = acq_disp_elem.text if acq_disp_elem is not None else "A"
+                trans_data["acquisitionDisposition"] = acq_disp
+                
+                print(f"    Code: {trans_code}, Acq/Disp: {acq_disp} -> {('BUY' if acq_disp == 'A' else 'SELL')}")
+                
+                # Map to BUY/SELL based on Acquisition/Disposition (A=Acquired/BUY, D=Disposed/SELL)
+                if acq_disp == "A":
+                    trans_data["transactionType"] = "BUY"
+                else:
+                    trans_data["transactionType"] = "SELL"
+                
+                # Shares transacted
+                shares_elem = transaction.find(".//transactionAmounts/transactionShares/value")
+                shares = float(shares_elem.text) if shares_elem is not None and shares_elem.text else 0
+                trans_data["sharesTransacted"] = int(shares)
+                
+                # Price per share
+                price_elem = transaction.find(".//transactionAmounts/transactionPricePerShare/value")
+                price = float(price_elem.text) if price_elem is not None and price_elem.text else 0
+                trans_data["pricePerShare"] = price
+                
+                # Transaction value
+                trans_data["transactionValue"] = shares * price
+                
+                # Shares owned after transaction
+                shares_after_elem = transaction.find(".//postTransactionAmounts/sharesOwnedFollowingTransaction/value")
+                shares_after = float(shares_after_elem.text) if shares_after_elem is not None and shares_after_elem.text else 0
+                trans_data["sharesOwnedAfter"] = int(shares_after)
+                
+                # Direct or Indirect ownership
+                ownership_elem = transaction.find(".//ownershipNature/directOrIndirectOwnership/value")
+                trans_data["directOrIndirect"] = ownership_elem.text if ownership_elem is not None else "D"
+                
+                # Add insider info
+                trans_data["insiderName"] = insider_name
+                trans_data["insiderTitle"] = officer_title
+                trans_data["isDirector"] = is_director
+                trans_data["isOfficer"] = is_officer
+                trans_data["isTenPercentOwner"] = is_ten_percent
+                trans_data["isOther"] = is_other
+                
+                # Skip if no shares or price
+                if trans_data["sharesTransacted"] > 0 and trans_data["pricePerShare"] > 0:
+                    transactions.append(trans_data)
+                    
+            except Exception as e:
+                print(f"Error parsing transaction: {e}")
+                continue
+        
+        return transactions
+        
+    except Exception as e:
+        print(f"Error parsing Form 4 XML: {e}")
+        return []
+
+
+def calculate_conviction_score(trans: Dict) -> int:
+    """
+    Calculate conviction score (0-100) based on transaction attributes.
+    """
+    score = 50  # Base score
+    
+    # Transaction size impact
+    value = trans.get("transactionValue", 0)
+    if value > 1_000_000:
+        score += 20
+    elif value > 100_000:
+        score += 10
+    elif value > 10_000:
+        score += 5
+    
+    # Insider role weight
+    if trans.get("isTenPercentOwner"):
+        score += 15
+    elif "CEO" in trans.get("insiderTitle", "").upper() or "CFO" in trans.get("insiderTitle", "").upper():
+        score += 10
+    elif trans.get("isDirector"):
+        score += 5
+    
+    # Direct ownership bonus
+    if trans.get("directOrIndirect") == "D":
+        score += 10
+    
+    # Discretionary purchase (open market)
+    if trans.get("transactionCode") == "P":
+        score += 15
+    
+    # Penalty for automatic transactions
+    if trans.get("transactionCode") in ["M", "F", "A"]:
+        score -= 10
+    
+    return min(max(score, 0), 100)
+
+
+def get_signal_label(trans: Dict) -> str:
+    """
+    Generate signal label based on conviction score and transaction type.
+    """
+    score = trans.get("convictionScore", 50)
+    trans_type = trans.get("transactionType", "BUY")
+    
+    if trans_type == "BUY":
+        if score >= 75:
+            return "Strong Buy"
+        elif score >= 60:
+            return "Moderate Buy"
+        else:
+            return "Weak Buy"
+    else:  # SELL
+        if score >= 75:
+            return "Strong Sell"
+        elif score >= 60:
+            return "Moderate Sell"
+        else:
+            return "Weak Sell"
+
+
+@app.get("/insider-trading")
+def get_insider_trading_sec(ticker: str):
+    """
+    Fetch insider trading data from SEC EDGAR Form 4 filings.
+    Returns parsed transactions with conviction scores.
+    """
+    try:
+        print(f"Fetching SEC EDGAR insider trades for {ticker}...")
+        ticker = ticker.upper().strip()
+        
+        # Get CIK for ticker
+        cik = get_cik_for_ticker(ticker)
+        if not cik:
+            return {"error": f"Could not find CIK for ticker {ticker}", "trades": []}
+        
+        print(f"Found CIK {cik} for {ticker}")
+        
+        # Fetch Form 4 filings list from SEC
+        url = "https://www.sec.gov/cgi-bin/browse-edgar"
+        params = {
+            "action": "getcompany",
+            "CIK": cik,
+            "type": "4",  # Form 4 = insider transactions
+            "dateb": "",
+            "owner": "only",
+            "count": "100",  # Last 100 filings
+            "output": "atom"
+        }
+        
+        headers = {
+            "User-Agent": "Quantify Platform contact@quantify.com"
+        }
+        
+        # Rate limiting: SEC allows 10 requests/second
+        time.sleep(0.11)  # 110ms between requests = ~9 req/sec (safe)
+        
+        response = requests.get(url, params=params, headers=headers, timeout=15)
+        response.raise_for_status()
+        
+        print(f"SEC Response Status: {response.status_code}")
+        print(f"SEC Response Length: {len(response.content)} bytes")
+        
+        # Parse ATOM feed to get filing URLs
+        root = ET.fromstring(response.content)
+        
+        # Debug: Check what we got
+        print(f"Root tag: {root.tag}")
+        
+        all_transactions = []
+        filing_count = 0
+        
+        # Try both with and without namespace
+        entries = root.findall(".//{http://www.w3.org/2005/Atom}entry")
+        if not entries:
+            # Try without namespace (some feeds don't use it)
+            entries = root.findall(".//entry")
+        
+        print(f"Found {len(entries)} entries in ATOM feed")
+        
+        # Process up to 20 most recent filings
+        for entry in entries[:20]:
+            try:
+                # Get filing date (try with and without namespace)
+                filing_date_elem = entry.find(".//{http://www.w3.org/2005/Atom}updated")
+                if filing_date_elem is None:
+                    filing_date_elem = entry.find(".//updated")
+                filing_date = filing_date_elem.text.split("T")[0] if filing_date_elem is not None else ""
+                
+                # Get accession number from summary
+                accession_elem = entry.find(".//{http://www.w3.org/2005/Atom}summary")
+                if accession_elem is None:
+                    accession_elem = entry.find(".//summary")
+                summary_text = accession_elem.text if accession_elem is not None else ""
+                
+                print(f"  Filing date: {filing_date}, Summary length: {len(summary_text)}")
+                
+                # Extract accession number from summary
+                import re
+                acc_match = re.search(r"(\d{10}-\d{2}-\d{6})", summary_text)
+                accession_number = acc_match.group(1) if acc_match else ""
+                
+                print(f"  Accession: {accession_number}")
+                
+                # Build URL to actual Form 4 XML
+                if accession_number:
+                    # SEC filing URL pattern
+                    acc_no_dashes = accession_number.replace("-", "")
+                    doc_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{acc_no_dashes}/{accession_number}.txt"
+                    
+                    # Fetch Form 4 document
+                    time.sleep(0.11)  # Rate limit
+                    doc_response = requests.get(doc_url, headers=headers, timeout=10)
+                    doc_response.raise_for_status()
+                    
+                    # Extract XML from SEC document (it's wrapped in text)
+                    content = doc_response.text
+                    xml_start = content.find("<?xml")
+                    xml_end = content.find("</ownershipDocument>") + len("</ownershipDocument>")
+                    
+                    if xml_start != -1 and xml_end > xml_start:
+                        xml_content = content[xml_start:xml_end]
+                        
+                        # Parse Form 4 XML
+                        transactions = parse_sec_form4(xml_content)
+                        
+                        # Add metadata and scoring
+                        for trans in transactions:
+                            trans["ticker"] = ticker
+                            trans["filingDate"] = filing_date
+                            trans["formType"] = "4"
+                            trans["accessionNumber"] = accession_number
+                            trans["secFilingUrl"] = f"https://www.sec.gov/cgi-bin/viewer?action=view&cik={cik}&accession_number={accession_number}&xbrl_type=v"
+                            trans["relationshipSummary"] = ", ".join([
+                                "Director" if trans.get("isDirector") else "",
+                                "Officer" if trans.get("isOfficer") else "",
+                                "10% Owner" if trans.get("isTenPercentOwner") else "",
+                                "Other" if trans.get("isOther") else ""
+                            ]).strip(", ")
+                            
+                            # Calculate conviction score
+                            trans["convictionScore"] = calculate_conviction_score(trans)
+                            trans["signalLabel"] = get_signal_label(trans)
+                            trans["confidenceBadge"] = "High" if trans["convictionScore"] >= 75 else "Medium" if trans["convictionScore"] >= 60 else "Low"
+                            
+                            # Derived flags
+                            trans["isDiscretionary"] = trans.get("transactionCode") == "P"
+                            trans["isAutomaticTrade"] = trans.get("transactionCode") in ["M", "F"]
+                            trans["isCompensationRelated"] = trans.get("transactionCode") == "A"
+                            
+                            # Mock fields (would need more data to calculate properly)
+                            trans["floatImpactPct"] = 0.001  # Placeholder
+                            trans["ownershipChangePct"] = 0.0  # Placeholder
+                            trans["signalReason"] = f"{trans['signalLabel']} based on {trans['transactionType']} of ${trans['transactionValue']:,.0f}"
+                        
+                        all_transactions.extend(transactions)
+                        filing_count += 1
+                        
+            except Exception as e:
+                print(f"Error processing filing: {e}")
+                continue
+        
+        # Sort by transaction date (most recent first)
+        all_transactions.sort(key=lambda x: x.get("transactionDate", ""), reverse=True)
+        
+        # Return top 20 most recent
+        result = all_transactions[:20]
+        
+        print(f"Fetched {len(result)} transactions from {filing_count} filings for {ticker}")
+        
+        return result
+        
+    except Exception as e:
+        print(f"Error fetching SEC insider data for {ticker}: {e}")
+        traceback.print_exc()
+        return {"error": str(e), "trades": []}

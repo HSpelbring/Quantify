@@ -1,197 +1,707 @@
-.insights-container {
+/* PAGE CONTAINER */
+.insights-page {
     padding: 20px;
-    color: #e0e0e0;
-    max-width: 1200px;
-    margin: 0 auto;
+    background-color: #121212;
+    min-height: 100vh;
+    color: #fff;
 }
 
 .page-title {
-    font-size: 24px;
-    margin-bottom: 20px;
-    font-weight: 300;
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 0 25px 0;
+    color: #fff;
+}
+
+/* DASHBOARD GRID - Two Column Layout */
+.dashboard-grid {
+    display: flex;
+    gap: 20px;
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+/* LEFT COLUMN: Market + Sectors + Movers */
+.left-column {
+    flex: 0 0 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* RIGHT COLUMN: Opportunities */
+.right-column {
+    flex: 1;
+    min-width: 0;
+}
+
+/* SECTION 1: Market Overall Card (Clickable) */
+.market-overall-card {
+    background: linear-gradient(135deg, #1e1e1e 0%, #252525 100%);
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 25px;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+}
+
+.market-overall-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #28a745, #4fc3f7);
+}
+
+.market-overall-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    border-color: #4fc3f7;
+}
+
+.market-overall-card h2 {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    color: #888;
+    margin: 0 0 15px 0;
     letter-spacing: 1px;
 }
 
-.loading,
-.error {
-    text-align: center;
-    margin-top: 50px;
-    color: #888;
-}
-
-.error {
-    color: #ff4444;
-}
-
-.dashboard-grid {
+.market-status-display {
     display: flex;
-    flex-direction: column;
-    gap: 20px;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
 }
 
-.card {
-    background: #1e1e1e;
-    border-radius: 12px;
-    padding: 20px;
-    border: 1px solid #333;
+.status-icon {
+    font-size: 3rem;
 }
 
-h2 {
-    font-size: 16px;
-    color: #888;
-    margin-bottom: 15px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+.status-label {
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: 1px;
 }
 
-/* SENTIMENT SECTION */
-.sentiment-section {
-    display: grid;
-    grid-template-columns: 1fr 2fr;
-    gap: 20px;
+.confidence-score {
+    font-size: 1.8rem;
+    margin-bottom: 8px;
 }
 
-.gauge-container {
-    text-align: center;
-    padding: 20px 0;
+.score-value {
+    font-weight: 700;
+    color: #4fc3f7;
 }
 
-.gauge-score {
-    font-size: 48px;
-    font-weight: bold;
+.score-max {
+    color: #666;
+    font-size: 1.2rem;
 }
 
-.gauge-label {
-    font-size: 18px;
-    color: #ccc;
+.subtitle {
+    color: #aaa;
+    font-size: 0.9rem;
     margin-bottom: 10px;
 }
 
-.gauge-bar {
-    width: 100%;
-    height: 8px;
-    background: #333;
+/* NEW: Implication line */
+.implication {
+    color: #4fc3f7;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background: rgba(79, 195, 247, 0.1);
     border-radius: 4px;
-    overflow: hidden;
-    margin-top: 10px;
+    border-left: 2px solid #4fc3f7;
 }
 
-.gauge-fill {
-    height: 100%;
-    transition: width 0.5s ease;
+.click-hint {
+    color: #666;
+    font-size: 0.75rem;
+    text-align: right;
+    font-style: italic;
 }
 
-.ai-summary p {
-    font-size: 16px;
-    line-height: 1.6;
-    color: #ccc;
+/* SECTION 2: Sector Performance */
+.sector-performance-card {
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 25px;
 }
 
-/* NEWS FEED */
-.news-list {
+.sector-performance-card h2 {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    color: #888;
+    margin: 0 0 20px 0;
+    letter-spacing: 1px;
+}
+
+.sector-list {
     display: flex;
     flex-direction: column;
-    gap: 15px;
-}
-
-.news-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #333;
-}
-
-.news-item:last-child {
-    border-bottom: none;
-}
-
-.news-title {
-    font-size: 15px;
-    font-weight: 500;
-    color: #fff;
-    margin-bottom: 5px;
-}
-
-.news-meta {
-    font-size: 12px;
-    color: #888;
-}
-
-.sentiment-tag {
-    margin-left: 10px;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 10px;
-    text-transform: uppercase;
-}
-
-.sentiment-tag.bullish {
-    background: rgba(0, 200, 81, 0.2);
-    color: #00C851;
-}
-
-.sentiment-tag.bearish {
-    background: rgba(255, 68, 68, 0.2);
-    color: #ff4444;
-}
-
-.news-score {
-    font-size: 14px;
-    font-weight: bold;
-    color: #666;
-}
-
-/* SECTOR PERF */
-.sector-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    /* Responsive columns */
     gap: 15px;
 }
 
 .sector-item {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    font-size: 13px;
+    gap: 12px;
+    padding: 10px;
+    background: #252525;
+    border-radius: 6px;
+}
+
+.sector-icon {
+    font-size: 1.2rem;
 }
 
 .sector-name {
-    width: 140px;
+    flex: 1;
+    font-weight: 500;
+    color: #ddd;
+}
+
+.sector-status {
+    font-size: 0.85rem;
     color: #aaa;
 }
 
-.sector-bar-container {
-    flex: 1;
-    height: 6px;
-    background: #2a2a2a;
-    border-radius: 3px;
-    margin: 0 10px;
-    display: flex;
-    /* Allow centering of bar for negative/positive split effect if desired later */
-    justify-content: flex-start;
-    /* Default start */
+/* NEW: Sector trend arrow */
+.sector-trend {
+    font-size: 1rem;
+    margin-left: 8px;
+    color: #4fc3f7;
 }
 
-/* Simple bar for now */
-.sector-bar {
+/* SECTION 3: Opportunities */
+.opportunities-section {
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 25px;
     height: 100%;
-    border-radius: 3px;
-    transition: width 0.5s;
-    max-width: 100%;
 }
 
-.sector-val {
-    width: 50px;
+.section-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin: 0 0 20px 0;
+    color: #fff;
+}
+
+.opportunity-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+}
+
+.opportunity-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.group-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.buy-header {
+    background: rgba(40, 167, 69, 0.15);
+    color: #28a745;
+    border-left: 3px solid #28a745;
+}
+
+.watch-header {
+    background: rgba(255, 193, 7, 0.15);
+    color: #ffc107;
+    border-left: 3px solid #ffc107;
+}
+
+.sell-header {
+    background: rgba(220, 53, 69, 0.15);
+    color: #dc3545;
+    border-left: 3px solid #dc3545;
+}
+
+.group-icon {
+    font-size: 1.1rem;
+}
+
+.group-label {
+    font-weight: 700;
+}
+
+/* NEW: Group dividers */
+.group-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #333, transparent);
+    margin: 8px 0;
+}
+
+/* Opportunity Cards - Tighter spacing */
+.opportunity-card {
+    background: #252525;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.opportunity-card:hover {
+    transform: translateX(4px);
+    border-color: #4fc3f7;
+    background: #2a2a2a;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.ticker-action {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ticker {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.action-badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.action-buy {
+    background: #28a745;
+    color: white;
+}
+
+.action-sell {
+    background: #dc3545;
+    color: white;
+}
+
+.action-watch {
+    background: #ffc107;
+    color: #000;
+}
+
+.conviction-score {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+/* NEW: Enhanced conviction display with label */
+.conviction-display {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.conviction-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    opacity: 0.9;
+}
+
+/* NEW: Risk confidence framing */
+.conviction-display.risk {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.risk-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    color: #888;
+    letter-spacing: 0.5px;
+}
+
+.time-horizon {
+    color: #aaa;
+    font-size: 0.85rem;
+    margin-left: 8px;
+}
+
+/* NEW: Why Now trigger line */
+.why-now {
+    color: #ddd;
+    font-size: 0.85rem;
+    margin-bottom: 10px;
+    padding: 6px 10px;
+    background: rgba(79, 195, 247, 0.05);
+    border-radius: 4px;
+}
+
+.why-now-label {
+    color: #4fc3f7;
+    font-weight: 600;
+}
+
+/* NEW: Waiting For condition line */
+.waiting-for {
+    color: #ffc107;
+    font-size: 0.85rem;
+    margin-bottom: 10px;
+    padding: 6px 10px;
+    background: rgba(255, 193, 7, 0.05);
+    border-radius: 4px;
+}
+
+.waiting-label {
+    font-weight: 600;
+}
+
+.tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.tag {
+    background: #333;
+    color: #888;
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+
+/* SECTION 4: Top Movers - Stacked in Left Column */
+.movers-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.movers-card {
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 20px;
+}
+
+.movers-card h3 {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    color: #888;
+    margin: 0 0 15px 0;
+    letter-spacing: 1px;
+}
+
+.mover-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.mover-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background: #252525;
+    border-radius: 6px;
+}
+
+.mover-ticker {
+    font-weight: 600;
+    color: #ddd;
+    flex: 1;
+}
+
+/* NEW: Mover right section */
+.mover-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.mover-change {
+    font-weight: 700;
+    min-width: 60px;
     text-align: right;
-    font-weight: bold;
 }
 
-.sector-val.pos {
-    color: #00C851;
+.mover-change.positive {
+    color: #28a745;
 }
 
-.sector-val.neg {
-    color: #ff4444;
+.mover-change.negative {
+    color: #dc3545;
+}
+
+/* NEW: Cross-link indicator */
+.insight-link {
+    font-size: 0.7rem;
+    color: #4fc3f7;
+    font-weight: 600;
+}
+
+/* NEW: Conflicting Signals Section */
+.conflicting-signals-card {
+    background: #1e1e1e;
+    border: 1px solid #ffc107;
+    border-left: 3px solid #ffc107;
+    border-radius: 12px;
+    padding: 20px;
+}
+
+.conflicting-signals-card h2 {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    color: #ffc107;
+    margin: 0 0 15px 0;
+    letter-spacing: 1px;
+}
+
+.conflict-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.conflict-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px;
+    background: rgba(255, 193, 7, 0.05);
+    border-radius: 6px;
+    border-left: 2px solid #ffc107;
+}
+
+.conflict-ticker {
+    font-weight: 700;
+    color: #fff;
+    font-size: 0.9rem;
+}
+
+.conflict-text {
+    color: #ccc;
+    font-size: 0.85rem;
+}
+
+/* MODALS */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.2s;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.modal-content {
+    background: #1e1e1e;
+    border: 1px solid #444;
+    border-radius: 12px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    animation: slideUp 0.3s;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 25px;
+    border-bottom: 1px solid #333;
+}
+
+.modal-header h2 {
+    font-size: 1.3rem;
+    margin: 0;
+    color: #fff;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 2rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.modal-close:hover {
+    color: #fff;
+}
+
+.modal-body {
+    padding: 25px;
+}
+
+.modal-section {
+    margin-bottom: 20px;
+}
+
+.modal-section h3 {
+    font-size: 1rem;
+    margin: 0 0 10px 0;
+    color: #4fc3f7;
+}
+
+.modal-section ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.modal-section ul li {
+    color: #ddd;
+    margin-bottom: 8px;
+    padding-left: 15px;
+    position: relative;
+}
+
+.modal-section ul li::before {
+    content: '•';
+    position: absolute;
+    left: 0;
+    color: #4fc3f7;
+}
+
+.modal-section p {
+    color: #ddd;
+    line-height: 1.6;
+}
+
+.confidence-display,
+.conviction-display,
+.horizon-display {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.confidence-display .label,
+.conviction-display .label,
+.horizon-display .label {
+    color: #888;
+    font-size: 0.9rem;
+}
+
+.confidence-display .value,
+.conviction-display .value,
+.horizon-display .value {
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.conflict-list li {
+    color: #ffc107;
+}
+
+.conflict-list li::before {
+    color: #ffc107;
+    content: '⚠';
+}
+
+.related-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.related-pill {
+    background: #333;
+    color: #4fc3f7;
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.mock-news {
+    background: #252525;
+    padding: 15px;
+    border-radius: 6px;
+    border-left: 3px solid #4fc3f7;
+}
+
+.news-headline {
+    color: #ccc;
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+}
+
+/* Scrollbar Styling */
+.modal-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.modal-content::-webkit-scrollbar-track {
+    background: #1a1a1a;
+}
+
+.modal-content::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 4px;
+}
+
+.modal-content::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }

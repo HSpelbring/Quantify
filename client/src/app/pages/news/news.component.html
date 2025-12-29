@@ -1,26 +1,453 @@
 <div class="news-page">
 
-    <!-- SIDEBAR FILTERS -->
+    <!-- REDESIGNED SIDEBAR FILTERS -->
     <aside class="filters-sidebar">
-        <h2>Scanner Filters</h2>
+        <h2>News Filter <span class="filter-count" *ngIf="getActiveFilterCount() > 0">({{ getActiveFilterCount() }} {{
+                getActiveFilterCount() === 1 ? 'filter' : 'filters' }} active)</span></h2>
 
-        <div class="filter-group" *ngFor="let group of filterGroups">
-            <h3>{{ group.name }}</h3>
-            <div class="filter-options">
-                <label class="filter-check" *ngFor="let cat of group.categories">
-                    <input type="checkbox" [checked]="isCategorySelected(cat)" (change)="toggleCategoryFilter(cat)">
-                    <span class="checkmark" [class.active]="isCategorySelected(cat)" [attr.data-cat]="cat"></span>
-                    {{ cat }}
+        <!-- 1. STOCK / ASSET SELECTION (with integrated search) -->
+        <div class="filter-card">
+            <h3>Stock / Asset Selection</h3>
+            <!-- Integrated Search -->
+            <input type="text" class="search-input" [(ngModel)]="searchQuery"
+                placeholder="Search titles, tickers, tags…">
+
+            <!-- Selected Assets Pills -->
+            <div class="asset-pills" *ngIf="selectedAssets.length > 0">
+                <span class="asset-pill" *ngFor="let asset of selectedAssets">
+                    {{ asset }}
+                    <button class="pill-remove" (click)="removeAsset(asset)">×</button>
+                </span>
+            </div>
+        </div>
+
+        <!-- 2. ARTICLES INCLUDED -->
+        <div class="filter-card collapsible-section">
+            <div class="section-header" (click)="toggleSection('articles-included')"
+                [class.has-active]="getSectionActiveCount('articles-included') > 0">
+                <span class="accent-bar"></span>
+                <span class="arrow" [class.expanded]="isSectionExpanded('articles-included')">▶</span>
+                <h3>Articles Included</h3>
+                <span class="active-count" *ngIf="getSectionActiveCount('articles-included') > 0">
+                    ({{ getSectionActiveCount('articles-included') }})
+                </span>
+            </div>
+            <div class="section-content" *ngIf="isSectionExpanded('articles-included')">
+                <label class="filter-checkbox">
+                    <input type="checkbox" [(ngModel)]="articleTypes.verified">
+                    <span>Verified</span>
+                </label>
+                <label class="filter-checkbox">
+                    <input type="checkbox" [(ngModel)]="articleTypes.institutional">
+                    <span>Institutional</span>
+                </label>
+                <label class="filter-checkbox">
+                    <input type="checkbox" [(ngModel)]="articleTypes.analyst">
+                    <span>Analyst</span>
+                </label>
+                <label class="filter-checkbox">
+                    <input type="checkbox" [(ngModel)]="articleTypes.secondary">
+                    <span>Secondary</span>
+                </label>
+                <label class="filter-checkbox">
+                    <input type="checkbox" [(ngModel)]="articleTypes.opinionated">
+                    <span>Opinionated</span>
                 </label>
             </div>
         </div>
 
+        <!-- 4. EVENTS & ACTIONS -->
+        <div class="filter-card">
+            <h3 class="section-title">Events & Actions</h3>
+
+            <!-- Corporate Actions -->
+            <div class="collapsible-section category-blue">
+                <div class="section-header" (click)="toggleSection('corporate-actions')"
+                    [class.has-active]="getSectionActiveCount('corporate-actions') > 0"
+                    [style.border-left-color]="getSectionAccentColor('corporate-actions')">
+                    <span class="arrow" [class.expanded]="isSectionExpanded('corporate-actions')">▶</span>
+                    <h4>Corporate Actions</h4>
+                    <span class="active-count" *ngIf="getSectionActiveCount('corporate-actions') > 0">
+                        ({{ getSectionActiveCount('corporate-actions') }})
+                    </span>
+                </div>
+                <div class="section-content" *ngIf="isSectionExpanded('corporate-actions')">
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="corporateActions.mergerAnnounced">
+                        <span>Merger Announced</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="corporateActions.acquisition">
+                        <span>Acquisition</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="corporateActions.buyout">
+                        <span>Buyout</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="corporateActions.spinOff">
+                        <span>Spin-Off</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="corporateActions.divestiture">
+                        <span>Divestiture</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="corporateActions.ipo">
+                        <span>IPO</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="corporateActions.delisting">
+                        <span>Delisting</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Earnings & Financials -->
+            <div class="collapsible-section category-green">
+                <div class="section-header" (click)="toggleSection('earnings-financials')"
+                    [class.has-active]="getSectionActiveCount('earnings-financials') > 0"
+                    [style.border-left-color]="getSectionAccentColor('earnings-financials')">
+                    <span class="arrow" [class.expanded]="isSectionExpanded('earnings-financials')">▶</span>
+                    <h4>Earnings & Financial Results</h4>
+                    <span class="active-count" *ngIf="getSectionActiveCount('earnings-financials') > 0">
+                        ({{ getSectionActiveCount('earnings-financials') }})
+                    </span>
+                </div>
+                <div class="section-content" *ngIf="isSectionExpanded('earnings-financials')">
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="earningsFinancials.earningsBeat">
+                        <span>Earnings Beat</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="earningsFinancials.earningsMiss">
+                        <span>Earnings Miss</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="earningsFinancials.earningsInline">
+                        <span>Earnings Inline</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="earningsFinancials.revenueGrowth">
+                        <span>Revenue Growth</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="earningsFinancials.revenueDecline">
+                        <span>Revenue Decline</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="earningsFinancials.marginExpansion">
+                        <span>Margin Expansion</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="earningsFinancials.marginCompression">
+                        <span>Margin Compression</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Guidance & Outlook -->
+            <div class="collapsible-section category-yellow">
+                <div class="section-header" (click)="toggleSection('guidance-outlook')"
+                    [class.has-active]="getSectionActiveCount('guidance-outlook') > 0"
+                    [style.border-left-color]="getSectionAccentColor('guidance-outlook')">
+                    <span class="arrow" [class.expanded]="isSectionExpanded('guidance-outlook')">▶</span>
+                    <h4>Guidance & Outlook</h4>
+                    <span class="active-count" *ngIf="getSectionActiveCount('guidance-outlook') > 0">
+                        ({{ getSectionActiveCount('guidance-outlook') }})
+                    </span>
+                </div>
+                <div class="section-content" *ngIf="isSectionExpanded('guidance-outlook')">
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="guidanceOutlook.guidanceRaised">
+                        <span>Guidance Raised</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="guidanceOutlook.guidanceCut">
+                        <span>Guidance Cut</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="guidanceOutlook.guidanceIssued">
+                        <span>Guidance Issued</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="guidanceOutlook.forecastChange">
+                        <span>Forecast Change</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Capital Allocation -->
+            <div class="collapsible-section category-orange">
+                <div class="section-header" (click)="toggleSection('capital-allocation')"
+                    [class.has-active]="getSectionActiveCount('capital-allocation') > 0"
+                    [style.border-left-color]="getSectionAccentColor('capital-allocation')">
+                    <span class="arrow" [class.expanded]="isSectionExpanded('capital-allocation')">▶</span>
+                    <h4>Capital Allocation</h4>
+                    <span class="active-count" *ngIf="getSectionActiveCount('capital-allocation') > 0">
+                        ({{ getSectionActiveCount('capital-allocation') }})
+                    </span>
+                </div>
+                <div class="section-content" *ngIf="isSectionExpanded('capital-allocation')">
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="capitalAllocation.dividendDeclared">
+                        <span>Dividend Declared</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="capitalAllocation.dividendIncrease">
+                        <span>Dividend Increase</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="capitalAllocation.dividendCut">
+                        <span>Dividend Cut</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="capitalAllocation.shareBuyback">
+                        <span>Share Buyback</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="capitalAllocation.debtIssuance">
+                        <span>Debt Issuance</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="capitalAllocation.debtReduction">
+                        <span>Debt Reduction</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Legal & Regulatory -->
+            <div class="collapsible-section category-red">
+                <div class="section-header" (click)="toggleSection('legal-regulatory')"
+                    [class.has-active]="getSectionActiveCount('legal-regulatory') > 0"
+                    [style.border-left-color]="getSectionAccentColor('legal-regulatory')">
+                    <span class="arrow" [class.expanded]="isSectionExpanded('legal-regulatory')">▶</span>
+                    <h4>Legal & Regulatory</h4>
+                    <span class="active-count" *ngIf="getSectionActiveCount('legal-regulatory') > 0">
+                        ({{ getSectionActiveCount('legal-regulatory') }})
+                    </span>
+                </div>
+                <div class="section-content" *ngIf="isSectionExpanded('legal-regulatory')">
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="legalRegulatory.secFiling">
+                        <span>SEC Filing</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="legalRegulatory.secInvestigation">
+                        <span>SEC Investigation</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="legalRegulatory.lawsuit">
+                        <span>Lawsuit</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="legalRegulatory.settlement">
+                        <span>Settlement</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="legalRegulatory.antitrustAction">
+                        <span>Antitrust Action</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="legalRegulatory.regulatoryApproval">
+                        <span>Regulatory Approval</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="legalRegulatory.regulatoryRejection">
+                        <span>Regulatory Rejection</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. MARKET REACTION & SENTIMENT (Collapsible) -->
+        <div class="filter-card collapsible-section">
+            <div class="section-header" (click)="toggleSection('market-reaction')"
+                [class.has-active]="getSectionActiveCount('market-reaction') > 0">
+                <span class="accent-bar"></span>
+                <span class="arrow" [class.expanded]="isSectionExpanded('market-reaction')">▶</span>
+                <h3>Market Reaction & Sentiment</h3>
+                <span class="active-count" *ngIf="getSectionActiveCount('market-reaction') > 0">
+                    ({{ getSectionActiveCount('market-reaction') }})
+                </span>
+            </div>
+            <div class="section-content" *ngIf="isSectionExpanded('market-reaction')">
+                <label class="filter-checkbox">
+                    <input type="checkbox" [(ngModel)]="marketReaction.bullish">
+                    <span>Bullish</span>
+                </label>
+                <label class="filter-checkbox">
+                    <input type="checkbox" [(ngModel)]="marketReaction.bearish">
+                    <span>Bearish</span>
+                </label>
+                <label class="filter-checkbox">
+                    <input type="checkbox" [(ngModel)]="marketReaction.mixed">
+                    <span>Mixed</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- 6. ANALYST ACTIONS (Collapsible) -->
+        <div class="filter-card collapsible-section">
+            <div class="section-header" (click)="toggleSection('analyst-actions')"
+                [class.has-active]="getSectionActiveCount('analyst-actions') > 0">
+                <span class="accent-bar"></span>
+                <span class="arrow" [class.expanded]="isSectionExpanded('analyst-actions')">▶</span>
+                <h3>Analyst Actions</h3>
+                <span class="active-count" *ngIf="getSectionActiveCount('analyst-actions') > 0">
+                    ({{ getSectionActiveCount('analyst-actions') }})
+                </span>
+            </div>
+            <div class="section-content" *ngIf="isSectionExpanded('analyst-actions')">
+                <label class="filter-checkbox">
+                    <input type="checkbox" [(ngModel)]="analystActions.ratingUpgrade">
+                    <span>Rating Upgrade</span>
+                </label>
+                <label class="filter-checkbox">
+                    <input type="checkbox" [(ngModel)]="analystActions.ratingDowngrade">
+                    <span>Rating Downgrade</span>
+                </label>
+                <label class="filter-checkbox">
+                    <input type="checkbox" [(ngModel)]="analystActions.priceTargetRaised">
+                    <span>Price Target Raised</span>
+                </label>
+                <label class="filter-checkbox">
+                    <input type="checkbox" [(ngModel)]="analystActions.priceTargetCut">
+                    <span>Price Target Cut</span>
+                </label>
+                <label class="filter-checkbox">
+                    <input type="checkbox" [(ngModel)]="analystActions.coverageInitiated">
+                    <span>Coverage Initiated</span>
+                </label>
+                <label class="filter-checkbox">
+                    <input type="checkbox" [(ngModel)]="analystActions.coverageDropped">
+                    <span>Coverage Dropped</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- 7. SECTOR & INDUSTRY -->
+        <div class="filter-card collapsible-section">
+            <div class="section-header" (click)="toggleSection('sector-industry')"
+                [class.has-active]="getSectionActiveCount('sector-industry') > 0">
+                <span class="accent-bar"></span>
+                <span class="arrow" [class.expanded]="isSectionExpanded('sector-industry')">▶</span>
+                <h3>Sector & Industry</h3>
+                <span class="active-count" *ngIf="getSectionActiveCount('sector-industry') > 0">
+                    ({{ getSectionActiveCount('sector-industry') }})
+                </span>
+            </div>
+            <div class="section-content" *ngIf="isSectionExpanded('sector-industry')">
+                <div class="checkbox-grid">
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="sectors.technology">
+                        <span>Technology</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="sectors.energy">
+                        <span>Energy</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="sectors.healthcare">
+                        <span>Healthcare</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="sectors.financials">
+                        <span>Financials</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="sectors.consumer">
+                        <span>Consumer</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="sectors.semiconductors">
+                        <span>Semiconductors</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="sectors.ai">
+                        <span>AI</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" [(ngModel)]="sectors.biotech">
+                        <span>Biotech</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- 8. TIME RANGE & ASSET SCOPE (Side-by-Side) -->
+        <div class="side-by-side">
+            <div class="filter-card half">
+                <h3>Time Range</h3>
+                <label class="filter-radio">
+                    <input type="radio" [(ngModel)]="timeRange" value="today">
+                    <span>Today</span>
+                </label>
+                <label class="filter-radio">
+                    <input type="radio" [(ngModel)]="timeRange" value="last24h">
+                    <span>Last 24h</span>
+                </label>
+                <label class="filter-radio">
+                    <input type="radio" [(ngModel)]="timeRange" value="thisWeek">
+                    <span>This Week</span>
+                </label>
+                <label class="filter-radio">
+                    <input type="radio" [(ngModel)]="timeRange" value="custom">
+                    <span>Custom</span>
+                </label>
+            </div>
+
+            <div class="filter-card half">
+                <h3>Asset Scope</h3>
+                <label class="filter-radio">
+                    <input type="radio" [(ngModel)]="assetScope" value="any">
+                    <span>Any</span>
+                </label>
+                <label class="filter-radio">
+                    <input type="radio" [(ngModel)]="assetScope" value="single">
+                    <span>Single Stock</span>
+                </label>
+                <label class="filter-radio">
+                    <input type="radio" [(ngModel)]="assetScope" value="multiple">
+                    <span>Multiple Stocks</span>
+                </label>
+                <label class="filter-radio">
+                    <input type="radio" [(ngModel)]="assetScope" value="etf">
+                    <span>ETF / Index</span>
+                </label>
+                <label class="filter-radio">
+                    <input type="radio" [(ngModel)]="assetScope" value="crypto">
+                    <span>Crypto Asset</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- 9. FILTER LOGIC (Wide Footer) -->
+        <div class="filter-card filter-footer">
+            <h3>Filter Logic</h3>
+            <div class="logic-controls">
+                <label class="filter-radio">
+                    <input type="radio" [(ngModel)]="filterLogicMode" value="all">
+                    <span>Match ALL filters</span>
+                </label>
+                <label class="filter-radio">
+                    <input type="radio" [(ngModel)]="filterLogicMode" value="any">
+                    <span>Match ANY filters</span>
+                </label>
+            </div>
+            <div class="action-buttons">
+                <button class="btn-clear" (click)="clearAllFilters()">Clear All</button>
+                <button class="btn-save" (click)="savePreset()">Save Preset</button>
+            </div>
+        </div>
+
+        <!-- Results Counter -->
         <div class="stats">
             <p>Showing <strong>{{ filteredArticles.length }}</strong> of {{ articles.length }} articles</p>
         </div>
     </aside>
 
-    <!-- MAIN CONTENT -->
+    <!-- MAIN CONTENT (Unchanged) -->
     <main class="news-feed">
         <header class="feed-header">
             <div class="header-left">

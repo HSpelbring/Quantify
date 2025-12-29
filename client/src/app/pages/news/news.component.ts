@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { FundService } from '../../services/fund.service';
 
@@ -38,7 +38,7 @@ export interface Article {
 @Component({
     selector: 'app-news',
     standalone: true,
-    imports: [CommonModule, FormsModule, DatePipe, DecimalPipe],
+    imports: [CommonModule, FormsModule],
     templateUrl: './news.component.html',
     styleUrls: ['./news.component.css']
 })
@@ -48,16 +48,116 @@ export class NewsComponent implements OnInit {
     filteredArticles: Article[] = [];
     loading = false;
 
-    // Filter State
+    // Filter State (existing)
     selectedCategories: Set<TagCategory> = new Set();
     sortOption: 'recent' | 'bullish' | 'bearish' = 'recent';
+
+    // NEW UI State (visual only, no logic changes)
+    searchQuery = '';
+    selectedAssets: string[] = [];
+    assetMatchMode: 'any' | 'all' = 'any';
+    expandedSections = new Set<string>(['articles-included']); // Default open
+
+    // Articles Included (UI only)
+    articleTypes = {
+        verified: false,
+        institutional: false,
+        analyst: false,
+        secondary: false,
+        opinionated: false
+    };
+
+    // Events & Actions (UI only)
+    corporateActions = {
+        mergerAnnounced: false,
+        acquisition: false,
+        buyout: false,
+        spinOff: false,
+        divestiture: false,
+        ipo: false,
+        delisting: false
+    };
+
+    earningsFinancials = {
+        earningsBeat: false,
+        earningsMiss: false,
+        earningsInline: false,
+        revenueGrowth: false,
+        revenueDecline: false,
+        marginExpansion: false,
+        marginCompression: false
+    };
+
+    guidanceOutlook = {
+        guidanceRaised: false,
+        guidanceCut: false,
+        guidanceIssued: false,
+        forecastChange: false
+    };
+
+    capitalAllocation = {
+        dividendDeclared: false,
+        dividendIncrease: false,
+        dividendCut: false,
+        shareBuyback: false,
+        debtIssuance: false,
+        debtReduction: false
+    };
+
+    legalRegulatory = {
+        secFiling: false,
+        secInvestigation: false,
+        lawsuit: false,
+        settlement: false,
+        antitrustAction: false,
+        regulatoryApproval: false,
+        regulatoryRejection: false
+    };
+
+    // Market Reaction & Sentiment (UI only)
+    marketReaction = {
+        bullish: false,
+        bearish: false,
+        mixed: false
+    };
+
+    // Analyst Actions (UI only)
+    analystActions = {
+        ratingUpgrade: false,
+        ratingDowngrade: false,
+        priceTargetRaised: false,
+        priceTargetCut: false,
+        coverageInitiated: false,
+        coverageDropped: false
+    };
+
+    // Sector & Industry (UI only)
+    sectorSearch = '';
+    sectorMatchMode: 'any' | 'all' = 'any';
+    sectors = {
+        technology: false,
+        energy: false,
+        healthcare: false,
+        financials: false,
+        consumer: false,
+        semiconductors: false,
+        ai: false,
+        biotech: false
+    };
+
+    // Time Range & Asset Scope (UI only)
+    timeRange: 'today' | 'last24h' | 'thisWeek' | 'custom' = 'today';
+    assetScope: 'any' | 'single' | 'multiple' | 'etf' | 'crypto' = 'any';
+
+    // Filter Logic (UI only)
+    filterLogicMode: 'all' | 'any' = 'any';
 
     // Available filters (extracted from data or hardcoded)
     filterGroups = [
         { name: 'Asset Class', categories: ['Stock', 'Fund', 'Crypto'] as TagCategory[] },
         { name: 'Corporate Events', categories: ['Merger', 'Dividend', 'Management', 'Guidance'] as TagCategory[] },
         { name: 'Market Sentiment', categories: ['Positive', 'Negative', 'Analyst'] as TagCategory[] },
-        { name: 'Sectors & Macro', categories: ['Sector'] as TagCategory[] }, // We could split sectors if needed
+        { name: 'Sectors & Macro', categories: ['Sector'] as TagCategory[] },
         { name: 'Legal', categories: ['Legal'] as TagCategory[] }
     ];
 
@@ -138,6 +238,106 @@ export class NewsComponent implements OnInit {
         }
 
         this.filteredArticles = [...result]; // New reference
+    }
+
+    // NEW UI Methods (no logic changes)
+    toggleSection(sectionId: string) {
+        if (this.expandedSections.has(sectionId)) {
+            this.expandedSections.delete(sectionId);
+        } else {
+            this.expandedSections.add(sectionId);
+        }
+    }
+
+    isSectionExpanded(sectionId: string): boolean {
+        return this.expandedSections.has(sectionId);
+    }
+
+    removeAsset(asset: string) {
+        // UI only - remove asset pill
+        this.selectedAssets = this.selectedAssets.filter(a => a !== asset);
+    }
+
+    clearAllFilters() {
+        // UI only - placeholder for future logic
+        this.selectedCategories.clear();
+        this.selectedAssets = [];
+        this.searchQuery = '';
+        // Reset all checkbox states (placeholder)
+        console.log('Clear all filters - UI placeholder');
+    }
+
+    savePreset() {
+        // UI only - placeholder for future logic
+        console.log('Save preset - UI placeholder');
+    }
+
+    // UI Helper Methods for Visual Feedback
+    getActiveFilterCount(): number {
+        // Count all active filters (UI only - visual feedback)
+        let count = 0;
+
+        // Count selected assets
+        count += this.selectedAssets.length;
+
+        // Count article types
+        count += Object.values(this.articleTypes).filter(v => v).length;
+
+        // Count events & actions
+        count += Object.values(this.corporateActions).filter(v => v).length;
+        count += Object.values(this.earningsFinancials).filter(v => v).length;
+        count += Object.values(this.guidanceOutlook).filter(v => v).length;
+        count += Object.values(this.capitalAllocation).filter(v => v).length;
+        count += Object.values(this.legalRegulatory).filter(v => v).length;
+
+        // Count market reaction
+        count += Object.values(this.marketReaction).filter(v => v).length;
+
+        // Count analyst actions
+        count += Object.values(this.analystActions).filter(v => v).length;
+
+        // Count sectors
+        count += Object.values(this.sectors).filter(v => v).length;
+
+        return count;
+    }
+
+    getSectionActiveCount(sectionId: string): number {
+        // Get count of active filters in a specific section (UI only)
+        switch (sectionId) {
+            case 'articles-included':
+                return Object.values(this.articleTypes).filter(v => v).length;
+            case 'corporate-actions':
+                return Object.values(this.corporateActions).filter(v => v).length;
+            case 'earnings-financials':
+                return Object.values(this.earningsFinancials).filter(v => v).length;
+            case 'guidance-outlook':
+                return Object.values(this.guidanceOutlook).filter(v => v).length;
+            case 'capital-allocation':
+                return Object.values(this.capitalAllocation).filter(v => v).length;
+            case 'legal-regulatory':
+                return Object.values(this.legalRegulatory).filter(v => v).length;
+            case 'market-reaction':
+                return Object.values(this.marketReaction).filter(v => v).length;
+            case 'analyst-actions':
+                return Object.values(this.analystActions).filter(v => v).length;
+            case 'sector-industry':
+                return Object.values(this.sectors).filter(v => v).length;
+            default:
+                return 0;
+        }
+    }
+
+    getSectionAccentColor(sectionId: string): string {
+        // Get accent color for section headers (UI only)
+        const colorMap: { [key: string]: string } = {
+            'corporate-actions': '#007bff',
+            'earnings-financials': '#28a745',
+            'guidance-outlook': '#ffc107',
+            'capital-allocation': '#fd7e14',
+            'legal-regulatory': '#dc3545'
+        };
+        return colorMap[sectionId] || '#666';
     }
 
     getSentimentColor(score: number): string {

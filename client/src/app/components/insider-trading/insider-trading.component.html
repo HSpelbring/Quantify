@@ -1,0 +1,51 @@
+<div class="insider-trading-container">
+    <h3 class="section-title">Insider Trading</h3>
+
+    <!-- Loading State -->
+    <div *ngIf="loading" class="loading-state">
+        <div class="spinner"></div>
+        <p>Loading insider trades...</p>
+    </div>
+
+    <!-- Error State -->
+    <div *ngIf="error && !loading" class="error-state">
+        <p>{{ error }}</p>
+    </div>
+
+    <!-- Empty State -->
+    <div *ngIf="!loading && !error && trades.length === 0" class="empty-state">
+        <p>No recent insider activity detected.</p>
+    </div>
+
+    <!-- Compact Single-Line Rows (Scrollable) -->
+    <div *ngIf="!loading && !error && trades.length > 0" class="trades-list-scroll">
+        <div *ngFor="let trade of trades" class="trade-row-compact" [class.buy-row]="trade.transactionType === 'BUY'"
+            [class.sell-row]="trade.transactionType === 'SELL'">
+
+            <span class="ticker">{{ trade.ticker }}</span>
+            <span class="separator">│</span>
+            <span class="insider-name">{{ trade.insiderName }}</span>
+            <span class="insider-title">({{ trade.insiderTitle || 'Officer' }})</span>
+            <span class="separator">│</span>
+            <span class="action-badge" [class.buy-badge]="trade.transactionType === 'BUY'"
+                [class.sell-badge]="trade.transactionType === 'SELL'">
+                {{ trade.transactionType === 'BUY' ? '🟢' : '🔴' }} {{ trade.transactionType }}
+            </span>
+            <span class="separator">│</span>
+            <span class="shares-info">{{ formatSharesWithSign(trade.sharesTransacted, trade.transactionType) }} @ ${{
+                trade.pricePerShare.toFixed(2) }}</span>
+            <span class="separator">│</span>
+            <span class="value">{{ formatValue(trade.transactionValue) }}</span>
+            <span class="separator">│</span>
+            <span class="shares-after">After: {{ formatShares(trade.sharesOwnedAfter) }}</span>
+            <span class="separator">│</span>
+            <span class="ownership">{{ trade.directOrIndirect === 'D' ? 'Direct' : 'Indirect' }}</span>
+            <span class="separator">│</span>
+            <span class="date">{{ formatDateCompact(trade.transactionDate) }}</span>
+            <span class="separator">│</span>
+            <a class="sec-link" [href]="trade.secFilingUrl" target="_blank" rel="noopener"
+                (click)="$event.stopPropagation()">SEC ↗</a>
+        </div>
+    </div>
+
+</div>

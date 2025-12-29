@@ -411,6 +411,13 @@
   position: relative;
   width: 100%;
   padding: 10px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.chart-wrapper canvas {
+  max-width: 100%;
+  height: auto !important;
 }
 
 /* --- LOWER SECTION ROW --- */
@@ -670,19 +677,20 @@
 
 .wl-sym {
   font-weight: bold;
-  width: 60px;
-  color: #fff;
+  flex: 1;
+  color: #d4af37;
 }
 
 .wl-price {
   text-align: right;
-  width: 80px;
+  width: 70px;
   color: #ccc;
+  margin-right: 8px;
 }
 
 .wl-change {
   text-align: right;
-  flex: 1;
+  width: 70px;
   color: #444;
 }
 

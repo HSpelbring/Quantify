@@ -4,6 +4,7 @@ import (
 	"backend/internal/db"
 	"backend/internal/fetch"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -192,6 +193,105 @@ func RegisterRoutes(router *gin.Engine) {
 				return
 			}
 			c.JSON(http.StatusOK, results)
+		})
+
+		// Get latest filing date for a ticker
+		r.GET("/insider/latest/:ticker", func(c *gin.Context) {
+			ticker := c.Param("ticker")
+			filingDate, err := db.GetLatestFilingDate(ticker)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{
+				"ticker":     ticker,
+				"filingDate": filingDate.Format("2006-01-02"),
+			})
+		})
+
+		// Save insider trade (called from Python)
+		r.POST("/insider/save", func(c *gin.Context) {
+			var trade db.InsiderTrade
+			if err := c.BindJSON(&trade); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			err := db.SaveInsiderTrade(&trade)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			c.JSON(http.StatusOK, gin.H{"status": "saved"})
+		})
+
+		// Get insider trades for a ticker
+		r.GET("/insider/trades/:ticker", func(c *gin.Context) {
+			ticker := c.Param("ticker")
+			limit := 50
+
+			trades, err := db.GetInsiderTrades(ticker, limit)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			c.JSON(http.StatusOK, trades)
+		})
+
+		// Get single trade details by ID
+		r.GET("/insider/trade/:id", func(c *gin.Context) {
+			id := c.Param("id")
+			var tradeID int
+			_, err := fmt.Sscanf(id, "%d", &tradeID)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid ID"})
+				return
+			}
+
+			trade, err := db.GetInsiderTradeDetails(tradeID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			c.JSON(http.StatusOK, trade)
+		})
+
+		// Trigger ingestion via Python
+		r.POST("/insider/ingest/:ticker", func(c *gin.Context) {
+			ticker := c.Param("ticker")
+			resp, err := http.Get("http://localhost:8000/insider/ingest/" + ticker)
+			if err != nil {
+				log.Println("Error contacting Python service:", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			defer resp.Body.Close()
+			c.DataFromReader(http.StatusOK, resp.ContentLength, "application/json", resp.Body, nil)
+		})
+
+		// Insider Trading (SEC EDGAR)
+		r.GET("/insider-trading", func(c *gin.Context) {
+			ticker := c.Query("ticker")
+			if ticker == "" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "ticker parameter required"})
+				return
+			}
+
+			// Proxy to Python SEC EDGAR endpoint
+			url := fmt.Sprintf("http://localhost:8000/insider-trading?ticker=%s", ticker)
+			resp, err := http.Get(url)
+			if err != nil {
+				log.Println("Error contacting Python service for insider trading:", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			defer resp.Body.Close()
+
+			// Forward response
+			c.DataFromReader(http.StatusOK, resp.ContentLength, "application/json", resp.Body, nil)
 		})
 	}
 }

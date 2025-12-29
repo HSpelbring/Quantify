@@ -5,6 +5,7 @@ import { FundService } from '../../services/fund.service';
 import { Chart, registerables } from 'chart.js';
 import { Subject, Subscription, timer } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
+import { InsiderTradingComponent } from '../../components/insider-trading/insider-trading.component';
 
 // Register Chart.js components
 Chart.register(...registerables);
@@ -12,7 +13,7 @@ Chart.register(...registerables);
 @Component({
   selector: 'app-lookup',
   standalone: true,
-  imports: [NgFor, NgIf, NgClass, FormsModule],
+  imports: [NgFor, NgIf, NgClass, FormsModule, InsiderTradingComponent],
   templateUrl: './lookup.component.html',
   styleUrls: ['./lookup.component.css']
 })
@@ -42,6 +43,24 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
     if (c.includes('hold')) return 'hold';
     return '';
   }
+
+  getTargetPriceColor(): string {
+    const currentPrice = this.details.price;
+    const targetPrice = this.companyInfo.targetPrice;
+
+    if (!currentPrice || !targetPrice || currentPrice === 0) {
+      return '#888'; // Gray if no data
+    }
+
+    const percentDiff = ((targetPrice - currentPrice) / currentPrice) * 100;
+
+    if (percentDiff > 20) return '#2e7d32'; // Dark green
+    if (percentDiff > 0) return '#4caf50'; // Green
+    if (percentDiff === 0) return '#888'; // Gray (neutral)
+    if (percentDiff > -20) return '#ef5350'; // Red
+    return '#c62828'; // Dark red
+  }
+
   periodChange = 0;
   periodChangePercent = 0;
   loading = false;
@@ -78,6 +97,7 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
     website: '',
     country: '-',
     city: '-',
+    targetPrice: 0,
     recommendations: {
       consensus: 'N/A',
       strongBuy: 0,
@@ -304,6 +324,7 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
           website: data.website || '',
           country: data.country || 'N/A',
           city: data.city || 'N/A',
+          targetPrice: data.targetMeanPrice || 0,
           recommendations: data.recommendations || {
             consensus: 'N/A',
             strongBuy: 0,
@@ -595,6 +616,12 @@ export class LookupComponent implements OnInit, AfterViewInit, OnDestroy {
 
       if (this.activeTF === '1D') {
         return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      } else if (this.activeTF === '1Y' || this.activeTF === '5Y' || this.activeTF === 'MAX') {
+        // Show year for longer timeframes
+        const month = date.toLocaleDateString([], { month: 'short' });
+        const day = date.getDate();
+        const year = date.getFullYear().toString().slice(-2);
+        return `${month} ${day} '${year}`;
       } else {
         return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
       }

@@ -99,4 +99,42 @@ export class FundService {
       })
     );
   }
+
+  // Insider Trading Methods
+  ingestInsiderTrades(ticker: string): Observable<any> {
+    return this.http.post(`/api/insider/ingest/${ticker}`, {}).pipe(
+      catchError(err => {
+        console.error('Insider ingestion error:', err);
+        return of({ error: 'Failed to ingest insider trades', ingested: 0 });
+      })
+    );
+  }
+
+  getInsiderTrades(ticker: string): Observable<any[]> {
+    return this.http.get<any[]>(`/api/insider/trades/${ticker}`).pipe(
+      catchError(err => {
+        console.error('Insider trades fetch error:', err);
+        return of([]);
+      })
+    );
+  }
+
+  getInsiderTradeDetails(id: number): Observable<any> {
+    return this.http.get(`/api/insider/trade/${id}`).pipe(
+      catchError(err => {
+        console.error('Insider trade details error:', err);
+        return of({ error: 'Failed to fetch trade details' });
+      })
+    );
+  }
+
+  // SEC EDGAR Insider Trading (Direct from SEC)
+  getInsiderTradingSEC(ticker: string): Observable<any[]> {
+    return this.http.get<any[]>(`/api/insider-trading?ticker=${ticker}`).pipe(
+      catchError(err => {
+        console.error('SEC EDGAR fetch error:', err);
+        return of([]);
+      })
+    );
+  }
 }

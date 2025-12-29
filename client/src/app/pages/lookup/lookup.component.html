@@ -219,6 +219,13 @@
             </li>
           </ul>
 
+          <div class="analyst-summary" style="margin-bottom: 8px;">
+            <span class="label">Analyst Target:</span>
+            <span class="val" [style.color]="getTargetPriceColor()" style="font-weight: 600;">
+              {{ companyInfo.targetPrice > 0 ? '$' + companyInfo.targetPrice.toFixed(2) : 'N/A' }}
+            </span>
+          </div>
+
           <div class="analyst-summary">
             <span class="label">Analyst Consensus:</span>
             <span class="val" [ngClass]="getConsensusClass(companyInfo.recommendations.consensus)">
@@ -276,13 +283,8 @@
 
       </div>
 
-      <!-- Insider Trading Placeholder (Full Width) -->
-      <div class="insider-box panel">
-        <h3 class="box-title">Insider Trading</h3>
-        <div class="empty-msg" style="text-align:center; color:#666; padding: 20px;">
-          No recent insider activity detected.
-        </div>
-      </div>
+      <!-- Insider Trading Component -->
+      <app-insider-trading [ticker]="details.symbol"></app-insider-trading>
 
     </div>
   </div>

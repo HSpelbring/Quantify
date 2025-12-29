@@ -1,71 +1,283 @@
-<div class="insights-container">
-    <h1 class="page-title">Market Intelligence</h1>
+<div class="insights-page">
+    <h1 class="page-title">Market Insights</h1>
 
-    <div *ngIf="loading" class="loading">Analyzing market data...</div>
-    <div *ngIf="error" class="error">{{ error }}</div>
+    <!-- DASHBOARD GRID - Two Column Layout -->
+    <div class="dashboard-grid">
 
-    <div *ngIf="!loading && !error" class="dashboard-grid">
+        <!-- LEFT COLUMN: Market, Sectors, Movers -->
+        <div class="left-column">
 
-        <!-- ROW 1: Sentiment & AI Summary -->
-        <div class="sentiment-section">
-            <div class="card sentiment-card">
-                <h2>Fear & Greed Index</h2>
-                <div class="gauge-container">
-                    <div class="gauge-score" [style.color]="getSentimentColor(sentiment.score)">{{ sentiment.score }}
+            <!-- SECTION 1: Market Overall (Enhanced with Implication) -->
+            <div class="market-overall-card" (click)="openMarketModal()">
+                <h2>Market (Overall)</h2>
+                <div class="market-status-display">
+                    <div class="status-icon">{{ getMarketStatusIcon() }}</div>
+                    <div class="status-label" [style.color]="getMarketStatusColor()">
+                        {{ marketStatus.status }}
                     </div>
-                    <div class="gauge-label">{{ sentiment.label }}</div>
-                    <div class="gauge-bar">
-                        <div class="gauge-fill" [style.width.%]="sentiment.score"
-                            [style.background-color]="getSentimentColor(sentiment.score)"></div>
+                </div>
+                <div class="confidence-score">
+                    <span class="score-value">{{ marketStatus.confidence }}</span>
+                    <span class="score-max">/ 100</span>
+                </div>
+                <div class="subtitle">{{ marketStatus.subtitle }}</div>
+                <!-- NEW: Behavioral Implication -->
+                <div class="implication">{{ marketStatus.implication }}</div>
+                <div class="click-hint">Click for details</div>
+            </div>
+
+            <!-- SECTION 2: Sector Performance (Enhanced with Trends) -->
+            <div class="sector-performance-card">
+                <h2>Sector Performance</h2>
+                <div class="sector-list">
+                    <div class="sector-item" *ngFor="let sector of sectors">
+                        <span class="sector-icon">{{ getSectorStatusIcon(sector.status) }}</span>
+                        <span class="sector-name">{{ sector.name }}</span>
+                        <span class="sector-status">{{ sector.status }}</span>
+                        <!-- NEW: Trend arrow -->
+                        <span class="sector-trend">{{ sector.trend }}</span>
                     </div>
                 </div>
             </div>
 
-            <div class="card ai-card">
-                <h2>AI Market Sentinel</h2>
-                <div class="ai-summary">
-                    <p>{{ sentiment.summary }}</p>
-                </div>
-            </div>
-        </div>
+            <!-- SECTION 4: Top Movers (Enhanced with Cross-Links) -->
+            <div class="movers-wrapper">
 
-        <!-- ROW 2: News Feed -->
-        <div class="card news-feed">
-            <h2>Top Market News</h2>
-            <div class="news-list">
-                <div class="news-item" *ngFor="let item of news">
-                    <div class="news-content">
-                        <div class="news-title">{{ item.title }}</div>
-                        <div class="news-meta">
-                            <span class="news-source">{{ item.source }}</span> •
-                            <span class="sentiment-tag" [class.bullish]="item.sentiment === 'Bullish'"
-                                [class.bearish]="item.sentiment === 'Bearish'">{{ item.sentiment }}</span>
+                <!-- Top Gainers -->
+                <div class="movers-card gainers-card">
+                    <h3>Top Gainers</h3>
+                    <div class="mover-list">
+                        <div class="mover-item" *ngFor="let gainer of topGainers">
+                            <span class="mover-ticker">{{ gainer.ticker }}</span>
+                            <div class="mover-right">
+                                <span class="mover-change positive">+{{ gainer.change }}%</span>
+                                <!-- NEW: Cross-link indicator -->
+                                <span class="insight-link" *ngIf="isMoverInInsights(gainer.ticker)">↳ In Signals</span>
+                            </div>
                         </div>
                     </div>
-                    <div class="news-score">{{ item.score }}</div>
                 </div>
-            </div>
-        </div>
 
-        <!-- ROW 3: Sector Performance -->
-        <div class="card sector-perf">
-            <h2>Sector Performance (Daily)</h2>
-            <div class="sector-list">
-                <div class="sector-item" *ngFor="let sec of sectors">
-                    <div class="sector-name">{{ sec.name }}</div>
-                    <div class="sector-bar-container">
-                        <div class="sector-bar" [style.width.%]="sec.change < 0 ? sec.change * -10 : sec.change * 10"
-                            [style.background-color]="sec.change >= 0 ? '#00C851' : '#ff4444'"
-                            [style.margin-left]="sec.change < 0 ? 'auto' : '0'"
-                            [style.margin-right]="sec.change >= 0 ? 'auto' : '0'">
+                <!-- Top Losers -->
+                <div class="movers-card losers-card">
+                    <h3>Top Losers</h3>
+                    <div class="mover-list">
+                        <div class="mover-item" *ngFor="let loser of topLosers">
+                            <span class="mover-ticker">{{ loser.ticker }}</span>
+                            <div class="mover-right">
+                                <span class="mover-change negative">{{ loser.change }}%</span>
+                                <!-- NEW: Cross-link indicator -->
+                                <span class="insight-link" *ngIf="isMoverInInsights(loser.ticker)">↳ In Signals</span>
+                            </div>
                         </div>
                     </div>
-                    <div class="sector-val" [class.pos]="sec.change >= 0" [class.neg]="sec.change < 0">
-                        {{ sec.change > 0 ? '+' : ''}}{{ sec.change }}%
+                </div>
+
+            </div>
+
+            <!-- NEW: SECTION 8 - Conflicting Signals -->
+            <div class="conflicting-signals-card">
+                <h2>Conflicting Signals</h2>
+                <div class="conflict-list">
+                    <div class="conflict-item" *ngFor="let signal of conflictingSignals">
+                        <span class="conflict-ticker">{{ signal.ticker }}</span>
+                        <span class="conflict-text">{{ signal.conflict }}</span>
                     </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN: Top Opportunities -->
+        <div class="right-column">
+            <div class="opportunities-section">
+                <h2 class="section-title">Top Opportunities</h2>
+
+                <!-- Optional Visual Grouping by Action -->
+                <div class="opportunity-groups">
+
+                    <!-- BUY Group -->
+                    <div class="opportunity-group" *ngIf="buyOpportunities.length > 0">
+                        <div class="group-header buy-header">
+                            <span class="group-icon">🟢</span>
+                            <span class="group-label">BUY</span>
+                        </div>
+                        <div class="group-divider"></div>
+                        <div class="opportunity-card" *ngFor="let opp of buyOpportunities"
+                            (click)="openOpportunityModal(opp)">
+                            <div class="card-header">
+                                <div class="ticker-action">
+                                    <span class="ticker">{{ opp.ticker }}</span>
+                                    <span class="time-horizon">• {{ opp.timeHorizon }}</span>
+                                </div>
+                                <!-- Enhanced conviction with label -->
+                                <div class="conviction-display" [style.color]="getConvictionColor(opp.conviction)">
+                                    <span class="conviction-score">{{ opp.conviction }} / 100</span>
+                                    <span class="conviction-label">· {{ getConvictionLabel(opp.conviction) }}</span>
+                                </div>
+                            </div>
+                            <!-- NEW: Why Now trigger -->
+                            <div class="why-now" *ngIf="opp.whyNow">
+                                <span class="why-now-label">Why now:</span> {{ opp.whyNow }}
+                            </div>
+                            <div class="tags">
+                                <span class="tag" *ngFor="let tag of opp.tags">{{ tag }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- WATCH Group -->
+                    <div class="opportunity-group" *ngIf="watchOpportunities.length > 0">
+                        <div class="group-header watch-header">
+                            <span class="group-icon">⚠</span>
+                            <span class="group-label">WATCH</span>
+                        </div>
+                        <div class="group-divider"></div>
+                        <div class="opportunity-card" *ngFor="let opp of watchOpportunities"
+                            (click)="openOpportunityModal(opp)">
+                            <div class="card-header">
+                                <div class="ticker-action">
+                                    <span class="ticker">{{ opp.ticker }}</span>
+                                    <span class="time-horizon">• {{ opp.timeHorizon }}</span>
+                                </div>
+                                <!-- Enhanced conviction with label -->
+                                <div class="conviction-display" [style.color]="getConvictionColor(opp.conviction)">
+                                    <span class="conviction-score">{{ opp.conviction }} / 100</span>
+                                    <span class="conviction-label">· {{ getConvictionLabel(opp.conviction) }}</span>
+                                </div>
+                            </div>
+                            <!-- NEW: Why Now trigger -->
+                            <div class="why-now" *ngIf="opp.whyNow">
+                                <span class="why-now-label">Why now:</span> {{ opp.whyNow }}
+                            </div>
+                            <!-- NEW: Waiting For condition -->
+                            <div class="waiting-for" *ngIf="opp.waitingFor">
+                                <span class="waiting-label">Waiting for:</span> {{ opp.waitingFor }}
+                            </div>
+                            <div class="tags">
+                                <span class="tag" *ngFor="let tag of opp.tags">{{ tag }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SELL Group (Enhanced Risk Framing) -->
+                    <div class="opportunity-group" *ngIf="sellOpportunities.length > 0">
+                        <div class="group-header sell-header">
+                            <span class="group-icon">🔴</span>
+                            <span class="group-label">SELL / RISK</span>
+                        </div>
+                        <div class="group-divider"></div>
+                        <div class="opportunity-card" *ngFor="let opp of sellOpportunities"
+                            (click)="openOpportunityModal(opp)">
+                            <div class="card-header">
+                                <div class="ticker-action">
+                                    <span class="ticker">{{ opp.ticker }}</span>
+                                    <span class="time-horizon">• {{ opp.timeHorizon }}</span>
+                                </div>
+                                <!-- Enhanced: Risk Confidence framing -->
+                                <div class="conviction-display risk" [style.color]="getConvictionColor(opp.conviction)">
+                                    <span class="risk-label">Risk Confidence:</span>
+                                    <span class="conviction-score">{{ opp.conviction }} / 100</span>
+                                </div>
+                            </div>
+                            <!-- NEW: Why Now trigger -->
+                            <div class="why-now" *ngIf="opp.whyNow">
+                                <span class="why-now-label">Why now:</span> {{ opp.whyNow }}
+                            </div>
+                            <div class="tags">
+                                <span class="tag" *ngFor="let tag of opp.tags">{{ tag }}</span>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
 
     </div>
+
+    <!-- MODAL: Market Explanation -->
+    <div class="modal-overlay" *ngIf="showMarketModal" (click)="closeMarketModal()">
+        <div class="modal-content" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+                <h2>Market {{ marketStatus.status }} Classification</h2>
+                <button class="modal-close" (click)="closeMarketModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-section">
+                    <h3>Why this classification exists:</h3>
+                    <ul>
+                        <li *ngFor="let factor of marketExplanation.factors">{{ factor }}</li>
+                    </ul>
+                </div>
+                <div class="modal-section">
+                    <h3>What could change this?</h3>
+                    <p>{{ marketExplanation.whatCouldChange }}</p>
+                </div>
+                <div class="confidence-display">
+                    <span class="label">Confidence:</span>
+                    <span class="value" [style.color]="getMarketStatusColor()">{{ marketStatus.confidence }} /
+                        100</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Opportunity Details -->
+    <div class="modal-overlay" *ngIf="showOpportunityModal && selectedOpportunity" (click)="closeOpportunityModal()">
+        <div class="modal-content" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+                <h2>{{ selectedOpportunity.ticker }} — {{ selectedOpportunity.action }}</h2>
+                <button class="modal-close" (click)="closeOpportunityModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-section">
+                    <div class="conviction-display">
+                        <span class="label">Conviction:</span>
+                        <span class="value" [style.color]="getConvictionColor(selectedOpportunity.conviction)">
+                            {{ selectedOpportunity.conviction }} / 100 · {{
+                            getConvictionLabel(selectedOpportunity.conviction) }}
+                        </span>
+                    </div>
+                    <div class="horizon-display">
+                        <span class="label">Time Horizon:</span>
+                        <span class="value">{{ selectedOpportunity.timeHorizon }}</span>
+                    </div>
+                </div>
+
+                <div class="modal-section">
+                    <h3>Expanded Explanation</h3>
+                    <ul>
+                        <li *ngFor="let reason of selectedOpportunity.why">{{ reason }}</li>
+                    </ul>
+                </div>
+
+                <div class="modal-section"
+                    *ngIf="selectedOpportunity.conflictingSignals && selectedOpportunity.conflictingSignals.length > 0">
+                    <h3>⚠ Conflicting Signals</h3>
+                    <ul class="conflict-list">
+                        <li *ngFor="let signal of selectedOpportunity.conflictingSignals">{{ signal }}</li>
+                    </ul>
+                </div>
+
+                <div class="modal-section"
+                    *ngIf="selectedOpportunity.relatedAssets && selectedOpportunity.relatedAssets.length > 0">
+                    <h3>Related Assets</h3>
+                    <div class="related-pills">
+                        <span class="related-pill" *ngFor="let asset of selectedOpportunity.relatedAssets">{{ asset
+                            }}</span>
+                    </div>
+                </div>
+
+                <div class="modal-section mock-news">
+                    <h3>Recent Headlines (Mock)</h3>
+                    <div class="news-headline">• {{ selectedOpportunity.ticker }} reports strong quarterly results</div>
+                    <div class="news-headline">• Analysts raise price targets on {{ selectedOpportunity.ticker }}</div>
+                    <div class="news-headline">• Industry trends favor {{ selectedOpportunity.ticker }} positioning
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>

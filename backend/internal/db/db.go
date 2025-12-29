@@ -57,5 +57,11 @@ func InitDB() error {
 		return err
 	}
 
+	// Initialize insider trades table
+	err = InitInsiderTrades(DB)
+	if err != nil {
+		return err
+	}
+
 	return DB.Ping()
 }
