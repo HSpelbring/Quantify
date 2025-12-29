@@ -1,4 +1,4 @@
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, Input, OnInit, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FundService } from '../../services/fund.service';
 
@@ -9,7 +9,7 @@ import { FundService } from '../../services/fund.service';
     templateUrl: './insider-trading.component.html',
     styleUrls: ['./insider-trading.component.css']
 })
-export class InsiderTradingComponent implements OnInit {
+export class InsiderTradingComponent implements OnInit, OnChanges {
     @Input() ticker: string = '';
 
     trades: any[] = [];
@@ -19,8 +19,20 @@ export class InsiderTradingComponent implements OnInit {
     constructor(private fundService: FundService) { }
 
     ngOnInit() {
-        if (this.ticker) {
+        if (this.ticker && this.ticker !== '-') {
             this.loadInsiderTrades();
+        }
+    }
+
+    ngOnChanges(changes: SimpleChanges) {
+        if (changes['ticker'] && !changes['ticker'].isFirstChange()) {
+            if (this.ticker && this.ticker !== '-') {
+                this.loadInsiderTrades();
+            } else {
+                // Clear data if ticker is invalid or reset
+                this.trades = [];
+                this.error = '';
+            }
         }
     }
 
