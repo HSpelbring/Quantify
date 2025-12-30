@@ -1,7 +1,7 @@
-
 # Last updated: Real News Integration (Fixed Parsing)
 from fastapi import FastAPI
 from analytics.insights import generate_insight
+import rss_service
 import yfinance as yf
 from fastapi.middleware.cors import CORSMiddleware
 import time
@@ -15,6 +15,252 @@ import random
 import re
 import nltk
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# --- Source Categorization Logic ---
+def classify_source_type(provider: str, title: str) -> str:
+    """
+    Classifies article source into 5 distinct types based on provider and title keywords.
+    Priority: Verified > Institutional > Analyst > Opinionated > Secondary
+    """
+    p = provider.lower().strip()
+    t = title.lower()
+
+    # 1. VERIFIED (Official, 1st Party)
+    verified_providers = [
+        "pr newswire", "business wire", "globenewswire", "accesswire", 
+        "sec edgar", "investor relations", "sec.gov"
+    ]
+    if any(vp in p for vp in verified_providers):
+        return "Verified"
+
+    # 2. INSTITUTIONAL (Top Tier Journalism)
+    institutional_providers = [
+        "reuters", "bloomberg", "wall street journal", "wsj", "financial times", 
+        "cnbc", "associated press", "nikkei asia", "the economist"
+    ]
+    if any(ip in p for ip in institutional_providers):
+        # Edge case: Yahoo reposting Reuters is Institutional
+        return "Institutional"
+    
+    # Check Title for Institutional Sources (e.g. "Reuters: ...")
+    if any(ip in t for ip in institutional_providers):
+        return "Institutional"
+
+    # 3. ANALYST (Signals)
+    analyst_keywords = [
+        "upgrade", "downgrade", "initiates coverage", "price target", 
+        "reiterates buy", "reiterates sell", "reiterates hold", "rating"
+    ]
+    analyst_providers = ["benzinga", "tipranks", "zacks"]
+    
+    # Check Title Heuristics first for Analyst actions (strong signal)
+    if any(k in t for k in analyst_keywords):
+        return "Analyst"
+        
+    if any(ap in p for ap in analyst_providers):
+        # Seeking Alpha Quant/Ratings usually have specific titles, 
+        # but if provider is Benzinga it's 90% analyst/signal news.
+        return "Analyst"
+
+    # 4. OPINIONATED (Analysis/Persuasion)
+    opinion_providers = [
+        "motley fool", "seeking alpha", "investorplace", "thestreet", 
+        "barron's", "forbes", "medium"
+    ]
+    if any(op in p for op in opinion_providers):
+        return "Opinionated"
+
+    # 5. SECONDARY (Aggregators - Default)
+    # yahoo finance, investing.com, msn, marketscreener, google news
+    return "Secondary"
+
+# Initialize NLTK
+try:
+    nltk.data.find('vader_lexicon')
+except LookupError:
+    nltk.download('vader_lexicon')
+
+sia = SentimentIntensityAnalyzer()
+sia.lexicon.update({
+    'surge': 2.0, 'jumped': 1.5, 'soared': 2.0, 'climb': 1.5, 'plunge': -2.0,
+    'dive': -2.0, 'collapse': -2.5, 'crash': -3.0, 'miss': -1.5, 'beat': 1.5,
+    'strong': 1.0, 'weak': -1.0, 'guidance': 0.5, 'cut': -1.0, 'raised': 1.0,
+    'buyback': 1.5, 'dividend': 1.0, 'lawsuit': -2.0, 'investigation': -2.0
+})
+
+@app.get("/news")
+def get_market_news(symbols: str = ""):
+    """
+    Fetch news. If symbols provided, use YF for specific coverage.
+    If no symbols (General Market), use RSS Feeds + YF Top.
+    """
+    targets = [s.strip().upper() for s in symbols.split(",") if s.strip()]
+    
+    all_news = []
+    seen_ids = set() # Track by ID/Title hash to prevent duplicates
+
+    # 1. RSS FEEDS (Only if no specific symbols or coupled with general)
+    # We prioritize RSS for general market news as it's faster and more diverse
+    if not targets:
+        try:
+            print("Fetching RSS news...")
+            rss_items = rss_service.fetch_rss_news(limit_per_feed=5)
+            
+            for item in rss_items:
+                # AUTO-TAGGING & SENTIMENT
+                tags = auto_tag_news(item['title'], item['summary'])
+                
+                # Sentiment
+                full_text = f"{item['title']}. {item['summary']}"
+                scores = sia.polarity_scores(full_text)
+                sentiment_score = scores['compound']
+                
+                # Boost logic (reused)
+                has_positive_tag = any(t['category'] == 'Positive' for t in tags)
+                has_negative_tag = any(t['category'] == 'Negative' for t in tags)
+                
+                if has_positive_tag and sentiment_score < 0.2:
+                     sentiment_score = max(sentiment_score + 0.35, 0.25)
+                if has_negative_tag and sentiment_score > -0.2:
+                     sentiment_score = min(sentiment_score - 0.35, -0.25)
+
+                sentiment_label = "Neutral"
+                if sentiment_score >= 0.05: sentiment_label = "Positive"
+                elif sentiment_score <= -0.05: sentiment_label = "Negative"
+
+                # Generate ID
+                import hashlib
+                article_id = hashlib.md5(item['link'].encode("utf-8")).hexdigest()
+                
+                if article_id in seen_ids: continue
+                seen_ids.add(article_id)
+
+                # Source Type Classification
+                article_type = classify_source_type(item['source'], item['title'])
+
+                all_news.append({
+                    "id": article_id,
+                    "title": item['title'],
+                    "source": item['source'],
+                    "articleType": article_type,
+                    "timestamp": datetime.fromtimestamp(item['published_raw']).isoformat(),
+                    "sentimentScore": sentiment_score,
+                    "sentimentLabel": sentiment_label,
+                    "tags": tags,
+                    "link": item['link']
+                })
+        except Exception as e:
+            print(f"RSS Fetch Error: {e}")
+
+    # 2. YFINANCE (Specific Targets or fallback)
+    if not targets:
+        # Reduced YF list if we have RSS
+        targets = ["SPY", "NVDA", "BTC-USD"] # Just key movers
+    
+    # ... (Existing YF Logic)
+    for sym in targets:
+        try:
+            ticker = yf.Ticker(sym)
+            raw_news = ticker.news
+            
+            for item in raw_news[:5]: # Limit YF if mixing
+                # ... (Existing extraction logic, compacted for brevity in replacement)
+                content = item.get("content", item)
+                title = content.get("title", item.get("title", ""))
+                
+                # ID Check
+                article_id = item.get("id", item.get("uuid"))
+                if not article_id:
+                    import hashlib
+                    article_id = hashlib.md5(title.encode("utf-8")).hexdigest()
+                
+                if article_id in seen_ids: continue
+                
+                # Filter Junk
+                if not is_relevant_news(title): continue
+                
+                seen_ids.add(article_id)
+
+                # ... (Rest of extraction)
+                # Re-implementing extraction here since we are replacing the block
+                
+                # Provider
+                provider = "Yahoo Finance"
+                if "provider" in content:
+                    prov_data = content["provider"]
+                    if isinstance(prov_data, dict): provider = prov_data.get("displayName", "Yahoo Finance")
+                    else: provider = str(prov_data)
+                elif "publisher" in content: provider = content["publisher"]
+
+                # Link
+                raw_link = content.get("canonicalUrl") or content.get("link") or content.get("clickThroughUrl")
+                link = str(raw_link.get("url", "")) if isinstance(raw_link, dict) else str(raw_link or "")
+                
+                # Timestamp
+                # ... (reuse existing logic from file) ...
+                pub_date_str = content.get("pubDate")
+                display_time = ""
+                if pub_date_str:
+                    try:
+                        dt = datetime.fromisoformat(pub_date_str.replace("Z", "+00:00"))
+                        display_time = pub_date_str
+                    except:
+                        display_time = datetime.now().isoformat()
+                else:
+                    display_time = datetime.now().isoformat()
+
+                # Tags & Sentiment
+                tags = auto_tag_news(title)
+                if not tags: continue # Strict filter
+
+                # Sentiment
+                summary_text = content.get("summary", "")
+                full_text = f"{title}. {summary_text}"
+                scores = sia.polarity_scores(full_text)
+                sentiment_score = scores['compound']
+                
+                # Boost
+                has_positive_tag = any(t['category'] == 'Positive' for t in tags)
+                has_negative_tag = any(t['category'] == 'Negative' for t in tags)
+                if has_positive_tag and sentiment_score < 0.2: sentiment_score = max(sentiment_score + 0.35, 0.25)
+                if has_negative_tag and sentiment_score > -0.2: sentiment_score = min(sentiment_score - 0.35, -0.25)
+
+                sentiment_label = "Neutral"
+                if sentiment_score >= 0.05: sentiment_label = "Positive"
+                elif sentiment_score <= -0.05: sentiment_label = "Negative"
+
+                # Source Categorization
+                article_type = classify_source_type(provider, title)
+
+                all_news.append({
+                    "id": article_id,
+                    "title": title,
+                    "source": provider,
+                    "articleType": article_type,
+                    "timestamp": display_time,
+                    "sentimentScore": sentiment_score,
+                    "sentimentLabel": sentiment_label,
+                    "tags": tags,
+                    "link": link
+                })
+
+        except Exception as e:
+            print(f"YF Error {sym}: {e}")
+            continue
+
+    # Sort
+    all_news.sort(key=lambda x: x["timestamp"], reverse=True)
+    return all_news[:50]
 
 # Initialize NLTK
 try:

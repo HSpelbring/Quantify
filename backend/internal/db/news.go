@@ -12,7 +12,8 @@ type Article struct {
 	ID             string  `json:"id"`
 	Title          string  `json:"title"`
 	Source         string  `json:"source"`
-	Timestamp      string  `json:"timestamp"` // published_at
+	ArticleType    string  `json:"articleType"` // Verified, Institutional, etc.
+	Timestamp      string  `json:"timestamp"`   // published_at
 	SentimentScore float64 `json:"sentimentScore"`
 	SentimentLabel string  `json:"sentimentLabel"`
 	Tags           any     `json:"tags"` // JSON array or struct, kept as any for flexible encoding
@@ -27,14 +28,17 @@ func SaveArticles(articles []Article) error {
 	}
 	defer tx.Rollback()
 
+	// Ensure article_type column exists (idempotent check not easy here freely, relying on migration or previous Exec)
+
 	stmt, err := tx.Prepare(`
-		INSERT INTO news_articles (id, title, source, url, published_at, sentiment_score, sentiment_label, tags)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO news_articles (id, title, source, article_type, url, published_at, sentiment_score, sentiment_label, tags)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			tags = excluded.tags,
 			sentiment_score = excluded.sentiment_score,
 			sentiment_label = excluded.sentiment_label,
-			title = excluded.title, -- Update title in case of typos fixed upstream
+			article_type = excluded.article_type,
+			title = excluded.title,
 			url = excluded.url
 	`)
 	if err != nil {
@@ -50,6 +54,7 @@ func SaveArticles(articles []Article) error {
 			a.ID,
 			a.Title,
 			a.Source,
+			a.ArticleType,
 			a.Link,
 			a.Timestamp,
 			a.SentimentScore,
@@ -79,7 +84,7 @@ func SearchNews(query string, limit int) ([]Article, error) {
 	// Common pattern: SELECT * FROM news_articles WHERE rowid IN (SELECT rowid FROM news_fts WHERE news_fts MATCH ?)
 
 	rows, err := DB.Query(`
-		SELECT id, title, source, url, published_at, sentiment_score, sentiment_label, tags 
+		SELECT id, title, source, article_type, url, published_at, sentiment_score, sentiment_label, tags 
 		FROM news_articles 
 		WHERE rowid IN (
 			SELECT rowid FROM news_fts WHERE news_fts MATCH ? ORDER BY rank
@@ -100,6 +105,7 @@ func SearchNews(query string, limit int) ([]Article, error) {
 			&a.ID,
 			&a.Title,
 			&a.Source,
+			&a.ArticleType,
 			&a.Link,
 			&a.Timestamp,
 			&a.SentimentScore,
@@ -125,7 +131,7 @@ func SearchNews(query string, limit int) ([]Article, error) {
 // GetRecentArticles fetches the latest N articles from the DB
 func GetRecentArticles(limit int) ([]Article, error) {
 	rows, err := DB.Query(`
-		SELECT id, title, source, url, published_at, sentiment_score, sentiment_label, tags
+		SELECT id, title, source, article_type, url, published_at, sentiment_score, sentiment_label, tags
 		FROM news_articles
 		ORDER BY published_at DESC
 		LIMIT ?
@@ -143,6 +149,7 @@ func GetRecentArticles(limit int) ([]Article, error) {
 			&a.ID,
 			&a.Title,
 			&a.Source,
+			&a.ArticleType,
 			&a.Link,
 			&a.Timestamp,
 			&a.SentimentScore,

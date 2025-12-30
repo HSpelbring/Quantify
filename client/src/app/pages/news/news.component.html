@@ -34,23 +34,23 @@
             </div>
             <div class="section-content" *ngIf="isSectionExpanded('articles-included')">
                 <label class="filter-checkbox">
-                    <input type="checkbox" [(ngModel)]="articleTypes.verified">
+                    <input type="checkbox" [(ngModel)]="articleTypes.verified" (change)="applyFilters()">
                     <span>Verified</span>
                 </label>
                 <label class="filter-checkbox">
-                    <input type="checkbox" [(ngModel)]="articleTypes.institutional">
+                    <input type="checkbox" [(ngModel)]="articleTypes.institutional" (change)="applyFilters()">
                     <span>Institutional</span>
                 </label>
                 <label class="filter-checkbox">
-                    <input type="checkbox" [(ngModel)]="articleTypes.analyst">
+                    <input type="checkbox" [(ngModel)]="articleTypes.analyst" (change)="applyFilters()">
                     <span>Analyst</span>
                 </label>
                 <label class="filter-checkbox">
-                    <input type="checkbox" [(ngModel)]="articleTypes.secondary">
+                    <input type="checkbox" [(ngModel)]="articleTypes.secondary" (change)="applyFilters()">
                     <span>Secondary</span>
                 </label>
                 <label class="filter-checkbox">
-                    <input type="checkbox" [(ngModel)]="articleTypes.opinionated">
+                    <input type="checkbox" [(ngModel)]="articleTypes.opinionated" (change)="applyFilters()">
                     <span>Opinionated</span>
                 </label>
             </div>
@@ -73,31 +73,31 @@
                 </div>
                 <div class="section-content" *ngIf="isSectionExpanded('corporate-actions')">
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="corporateActions.mergerAnnounced">
+                        <input type="checkbox" [(ngModel)]="corporateActions.mergerAnnounced" (change)="applyFilters()">
                         <span>Merger Announced</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="corporateActions.acquisition">
+                        <input type="checkbox" [(ngModel)]="corporateActions.acquisition" (change)="applyFilters()">
                         <span>Acquisition</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="corporateActions.buyout">
+                        <input type="checkbox" [(ngModel)]="corporateActions.buyout" (change)="applyFilters()">
                         <span>Buyout</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="corporateActions.spinOff">
+                        <input type="checkbox" [(ngModel)]="corporateActions.spinOff" (change)="applyFilters()">
                         <span>Spin-Off</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="corporateActions.divestiture">
+                        <input type="checkbox" [(ngModel)]="corporateActions.divestiture" (change)="applyFilters()">
                         <span>Divestiture</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="corporateActions.ipo">
+                        <input type="checkbox" [(ngModel)]="corporateActions.ipo" (change)="applyFilters()">
                         <span>IPO</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="corporateActions.delisting">
+                        <input type="checkbox" [(ngModel)]="corporateActions.delisting" (change)="applyFilters()">
                         <span>Delisting</span>
                     </label>
                 </div>
@@ -116,31 +116,35 @@
                 </div>
                 <div class="section-content" *ngIf="isSectionExpanded('earnings-financials')">
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="earningsFinancials.earningsBeat">
+                        <input type="checkbox" [(ngModel)]="earningsFinancials.earningsBeat" (change)="applyFilters()">
                         <span>Earnings Beat</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="earningsFinancials.earningsMiss">
+                        <input type="checkbox" [(ngModel)]="earningsFinancials.earningsMiss" (change)="applyFilters()">
                         <span>Earnings Miss</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="earningsFinancials.earningsInline">
+                        <input type="checkbox" [(ngModel)]="earningsFinancials.earningsInline"
+                            (change)="applyFilters()">
                         <span>Earnings Inline</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="earningsFinancials.revenueGrowth">
+                        <input type="checkbox" [(ngModel)]="earningsFinancials.revenueGrowth" (change)="applyFilters()">
                         <span>Revenue Growth</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="earningsFinancials.revenueDecline">
+                        <input type="checkbox" [(ngModel)]="earningsFinancials.revenueDecline"
+                            (change)="applyFilters()">
                         <span>Revenue Decline</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="earningsFinancials.marginExpansion">
+                        <input type="checkbox" [(ngModel)]="earningsFinancials.marginExpansion"
+                            (change)="applyFilters()">
                         <span>Margin Expansion</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="earningsFinancials.marginCompression">
+                        <input type="checkbox" [(ngModel)]="earningsFinancials.marginCompression"
+                            (change)="applyFilters()">
                         <span>Margin Compression</span>
                     </label>
                 </div>
@@ -159,19 +163,19 @@
                 </div>
                 <div class="section-content" *ngIf="isSectionExpanded('guidance-outlook')">
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="guidanceOutlook.guidanceRaised">
+                        <input type="checkbox" [(ngModel)]="guidanceOutlook.guidanceRaised" (change)="applyFilters()">
                         <span>Guidance Raised</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="guidanceOutlook.guidanceCut">
+                        <input type="checkbox" [(ngModel)]="guidanceOutlook.guidanceCut" (change)="applyFilters()">
                         <span>Guidance Cut</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="guidanceOutlook.guidanceIssued">
+                        <input type="checkbox" [(ngModel)]="guidanceOutlook.guidanceIssued" (change)="applyFilters()">
                         <span>Guidance Issued</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="guidanceOutlook.forecastChange">
+                        <input type="checkbox" [(ngModel)]="guidanceOutlook.forecastChange" (change)="applyFilters()">
                         <span>Forecast Change</span>
                     </label>
                 </div>
@@ -190,27 +194,29 @@
                 </div>
                 <div class="section-content" *ngIf="isSectionExpanded('capital-allocation')">
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="capitalAllocation.dividendDeclared">
+                        <input type="checkbox" [(ngModel)]="capitalAllocation.dividendDeclared"
+                            (change)="applyFilters()">
                         <span>Dividend Declared</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="capitalAllocation.dividendIncrease">
+                        <input type="checkbox" [(ngModel)]="capitalAllocation.dividendIncrease"
+                            (change)="applyFilters()">
                         <span>Dividend Increase</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="capitalAllocation.dividendCut">
+                        <input type="checkbox" [(ngModel)]="capitalAllocation.dividendCut" (change)="applyFilters()">
                         <span>Dividend Cut</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="capitalAllocation.shareBuyback">
+                        <input type="checkbox" [(ngModel)]="capitalAllocation.shareBuyback" (change)="applyFilters()">
                         <span>Share Buyback</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="capitalAllocation.debtIssuance">
+                        <input type="checkbox" [(ngModel)]="capitalAllocation.debtIssuance" (change)="applyFilters()">
                         <span>Debt Issuance</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="capitalAllocation.debtReduction">
+                        <input type="checkbox" [(ngModel)]="capitalAllocation.debtReduction" (change)="applyFilters()">
                         <span>Debt Reduction</span>
                     </label>
                 </div>
@@ -229,31 +235,33 @@
                 </div>
                 <div class="section-content" *ngIf="isSectionExpanded('legal-regulatory')">
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="legalRegulatory.secFiling">
+                        <input type="checkbox" [(ngModel)]="legalRegulatory.secFiling" (change)="applyFilters()">
                         <span>SEC Filing</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="legalRegulatory.secInvestigation">
+                        <input type="checkbox" [(ngModel)]="legalRegulatory.secInvestigation" (change)="applyFilters()">
                         <span>SEC Investigation</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="legalRegulatory.lawsuit">
+                        <input type="checkbox" [(ngModel)]="legalRegulatory.lawsuit" (change)="applyFilters()">
                         <span>Lawsuit</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="legalRegulatory.settlement">
+                        <input type="checkbox" [(ngModel)]="legalRegulatory.settlement" (change)="applyFilters()">
                         <span>Settlement</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="legalRegulatory.antitrustAction">
+                        <input type="checkbox" [(ngModel)]="legalRegulatory.antitrustAction" (change)="applyFilters()">
                         <span>Antitrust Action</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="legalRegulatory.regulatoryApproval">
+                        <input type="checkbox" [(ngModel)]="legalRegulatory.regulatoryApproval"
+                            (change)="applyFilters()">
                         <span>Regulatory Approval</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="legalRegulatory.regulatoryRejection">
+                        <input type="checkbox" [(ngModel)]="legalRegulatory.regulatoryRejection"
+                            (change)="applyFilters()">
                         <span>Regulatory Rejection</span>
                     </label>
                 </div>
@@ -273,15 +281,15 @@
             </div>
             <div class="section-content" *ngIf="isSectionExpanded('market-reaction')">
                 <label class="filter-checkbox">
-                    <input type="checkbox" [(ngModel)]="marketReaction.bullish">
+                    <input type="checkbox" [(ngModel)]="marketReaction.bullish" (change)="applyFilters()">
                     <span>Bullish</span>
                 </label>
                 <label class="filter-checkbox">
-                    <input type="checkbox" [(ngModel)]="marketReaction.bearish">
+                    <input type="checkbox" [(ngModel)]="marketReaction.bearish" (change)="applyFilters()">
                     <span>Bearish</span>
                 </label>
                 <label class="filter-checkbox">
-                    <input type="checkbox" [(ngModel)]="marketReaction.mixed">
+                    <input type="checkbox" [(ngModel)]="marketReaction.mixed" (change)="applyFilters()">
                     <span>Mixed</span>
                 </label>
             </div>
@@ -300,27 +308,27 @@
             </div>
             <div class="section-content" *ngIf="isSectionExpanded('analyst-actions')">
                 <label class="filter-checkbox">
-                    <input type="checkbox" [(ngModel)]="analystActions.ratingUpgrade">
+                    <input type="checkbox" [(ngModel)]="analystActions.ratingUpgrade" (change)="applyFilters()">
                     <span>Rating Upgrade</span>
                 </label>
                 <label class="filter-checkbox">
-                    <input type="checkbox" [(ngModel)]="analystActions.ratingDowngrade">
+                    <input type="checkbox" [(ngModel)]="analystActions.ratingDowngrade" (change)="applyFilters()">
                     <span>Rating Downgrade</span>
                 </label>
                 <label class="filter-checkbox">
-                    <input type="checkbox" [(ngModel)]="analystActions.priceTargetRaised">
+                    <input type="checkbox" [(ngModel)]="analystActions.priceTargetRaised" (change)="applyFilters()">
                     <span>Price Target Raised</span>
                 </label>
                 <label class="filter-checkbox">
-                    <input type="checkbox" [(ngModel)]="analystActions.priceTargetCut">
+                    <input type="checkbox" [(ngModel)]="analystActions.priceTargetCut" (change)="applyFilters()">
                     <span>Price Target Cut</span>
                 </label>
                 <label class="filter-checkbox">
-                    <input type="checkbox" [(ngModel)]="analystActions.coverageInitiated">
+                    <input type="checkbox" [(ngModel)]="analystActions.coverageInitiated" (change)="applyFilters()">
                     <span>Coverage Initiated</span>
                 </label>
                 <label class="filter-checkbox">
-                    <input type="checkbox" [(ngModel)]="analystActions.coverageDropped">
+                    <input type="checkbox" [(ngModel)]="analystActions.coverageDropped" (change)="applyFilters()">
                     <span>Coverage Dropped</span>
                 </label>
             </div>
@@ -340,35 +348,35 @@
             <div class="section-content" *ngIf="isSectionExpanded('sector-industry')">
                 <div class="checkbox-grid">
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="sectors.technology">
+                        <input type="checkbox" [(ngModel)]="sectors.technology" (change)="applyFilters()">
                         <span>Technology</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="sectors.energy">
+                        <input type="checkbox" [(ngModel)]="sectors.energy" (change)="applyFilters()">
                         <span>Energy</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="sectors.healthcare">
+                        <input type="checkbox" [(ngModel)]="sectors.healthcare" (change)="applyFilters()">
                         <span>Healthcare</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="sectors.financials">
+                        <input type="checkbox" [(ngModel)]="sectors.financials" (change)="applyFilters()">
                         <span>Financials</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="sectors.consumer">
+                        <input type="checkbox" [(ngModel)]="sectors.consumer" (change)="applyFilters()">
                         <span>Consumer</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="sectors.semiconductors">
+                        <input type="checkbox" [(ngModel)]="sectors.semiconductors" (change)="applyFilters()">
                         <span>Semiconductors</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="sectors.ai">
+                        <input type="checkbox" [(ngModel)]="sectors.ai" (change)="applyFilters()">
                         <span>AI</span>
                     </label>
                     <label class="filter-checkbox">
-                        <input type="checkbox" [(ngModel)]="sectors.biotech">
+                        <input type="checkbox" [(ngModel)]="sectors.biotech" (change)="applyFilters()">
                         <span>Biotech</span>
                     </label>
                 </div>

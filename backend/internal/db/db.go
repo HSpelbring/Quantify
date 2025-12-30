@@ -22,6 +22,7 @@ func InitDB() error {
 		id TEXT PRIMARY KEY,
 		title TEXT,
 		source TEXT,
+		article_type TEXT,
 		url TEXT,
 		published_at TEXT,
 		sentiment_score REAL,
@@ -62,6 +63,10 @@ func InitDB() error {
 	if err != nil {
 		return err
 	}
+
+	// MIGRATION: Ensure article_type exists for existing databases
+	// We ignore the error because if the column exists, it will fail, which is fine.
+	_, _ = DB.Exec("ALTER TABLE news_articles ADD COLUMN article_type TEXT")
 
 	return DB.Ping()
 }

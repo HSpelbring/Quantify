@@ -25,12 +25,13 @@ export interface NewsTag {
 }
 
 export interface Article {
-    id: number;
+    id: string;
     title: string;
     source: string;
-    timestamp: string; // ISO string for simplicity
+    articleType?: string; // Verified, Institutional, Analyst, Opinionated, Secondary
+    timestamp: string; // ISO string
     sentimentScore: number;
-    sentimentLabel?: string; // e.g. "Highly Positive"
+    sentimentLabel: 'Positive' | 'Negative' | 'Neutral';
     tags: NewsTag[];
     link: string;
 }
@@ -60,8 +61,8 @@ export class NewsComponent implements OnInit {
 
     // Articles Included (UI only)
     articleTypes = {
-        verified: false,
-        institutional: false,
+        verified: true,
+        institutional: true,
         analyst: false,
         secondary: false,
         opinionated: false
@@ -75,7 +76,8 @@ export class NewsComponent implements OnInit {
         spinOff: false,
         divestiture: false,
         ipo: false,
-        delisting: false
+        delisting: false,
+        management: false
     };
 
     earningsFinancials = {
@@ -209,35 +211,104 @@ export class NewsComponent implements OnInit {
         return this.selectedCategories.has(category);
     }
 
-    // Filter based on currently active checkbox filters (AND logic or OR logic? Usually OR for categories)
-    // User said: "filter for articles tagged AAPL AND Earnings Beat". Wait, that's specific tag selection.
-    // The sidebar usually filters by "Show me all Positive news" or "Show me all Tech news".
-    // Let's implement OR logic for the sidebar categories (Show Positive OR Corporate).
-    // AND logic applies if multiple distinct *tag* filters were selected (e.g. text search + cat), but here we just have category toggles for now.
+    // Filter based on currently active checkbox filters
     applyFilters() {
         // 1. Filter
         let result = this.articles;
 
-        if (this.selectedCategories.size > 0) {
+        // Source Type Filtering (Articles Included)
+        result = result.filter(a => {
+            const type = a.articleType || 'Secondary'; // default fallback
+
+            if (type === 'Verified' && !this.articleTypes.verified) return false;
+            if (type === 'Institutional' && !this.articleTypes.institutional) return false;
+            if (type === 'Analyst' && !this.articleTypes.analyst) return false;
+            if (type === 'Opinionated' && !this.articleTypes.opinionated) return false;
+            if (type === 'Secondary' && !this.articleTypes.secondary) return false;
+
+            return true;
+        });
+
+        // Collect all active boolean filters
+        const hasCategories = this.selectedCategories.size > 0;
+        const hasFlags = this.hasActiveAdvancedFilters();
+
+        if (hasCategories || hasFlags) {
             result = result.filter(article => {
-                // Check if article has AT LEAST ONE tag in the selected categories
-                return article.tags.some(tag => this.selectedCategories.has(tag.category));
+                // 1. Check Categories
+                const matchesCategory = article.tags.some(tag => this.selectedCategories.has(tag.category));
+                if (matchesCategory) return true;
+
+                // 2. Check Advanced Flags
+                if (hasFlags && this.matchesAdvancedFilters(article)) return true;
+
+                return false;
             });
         }
 
         // 2. Sort
         if (this.sortOption === 'recent') {
-            // Already sorted by backend usually, but re-sort to be safe
             result.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
         } else if (this.sortOption === 'bullish') {
-            // High score first
             result.sort((a, b) => b.sentimentScore - a.sentimentScore);
         } else if (this.sortOption === 'bearish') {
-            // Low score first
+            // Low score first (most negative)
             result.sort((a, b) => a.sentimentScore - b.sentimentScore);
         }
 
-        this.filteredArticles = [...result]; // New reference
+        this.filteredArticles = [...result];
+    }
+
+    hasActiveAdvancedFilters(): boolean {
+        // Check if any specific boolean flag is true
+        return this.checkGroup(this.corporateActions) ||
+            this.checkGroup(this.earningsFinancials) ||
+            this.checkGroup(this.guidanceOutlook) ||
+            this.checkGroup(this.capitalAllocation) ||
+            this.checkGroup(this.legalRegulatory) ||
+            this.checkGroup(this.marketReaction) ||
+            this.checkGroup(this.analystActions);
+    }
+
+    checkGroup(group: any): boolean {
+        return Object.values(group).some(val => val === true);
+    }
+
+    matchesAdvancedFilters(article: Article): boolean {
+        const t = (label: string) => article.tags.some(tag => tag.label === label);
+        const c = (cat: string) => article.tags.some(tag => tag.category === cat);
+
+        // Corporate Actions
+        if (this.corporateActions.mergerAnnounced && (t('M&A') || c('Merger'))) return true;
+        if (this.corporateActions.acquisition && (t('M&A') || c('Merger'))) return true; // Broad matching
+        if (this.corporateActions.management && (t('Management') || c('Management'))) return true;
+
+        // Earnings
+        if (this.earningsFinancials.earningsBeat && t('Earnings Beat')) return true;
+        if (this.earningsFinancials.earningsMiss && t('Earnings Miss')) return true;
+
+        // Guidance
+        if (this.guidanceOutlook.guidanceRaised && (t('Guidance') && c('Positive'))) return true; // Approx
+        if (this.guidanceOutlook.guidanceCut && (t('Guidance') && c('Negative'))) return true;
+        if (this.guidanceOutlook.guidanceIssued && t('Guidance')) return true;
+
+        // Capital
+        if (this.capitalAllocation.dividendDeclared && (t('Dividend/Buyback') || c('Dividend'))) return true;
+        if (this.capitalAllocation.shareBuyback && t('Dividend/Buyback')) return true;
+
+        // Legal
+        if (this.legalRegulatory.lawsuit && (t('Legal/Regulatory') || c('Legal'))) return true;
+        if (this.legalRegulatory.secInvestigation && (t('Legal/Regulatory') || c('Legal'))) return true;
+
+        // Analyst
+        if (this.analystActions.ratingUpgrade && t('Analyst Upgrade')) return true;
+        if (this.analystActions.ratingDowngrade && t('Analyst Downgrade')) return true;
+
+        // Market Reaction (Sentiment)
+        if (this.marketReaction.bullish && article.sentimentScore > 0.2) return true;
+        if (this.marketReaction.bearish && article.sentimentScore < -0.2) return true;
+
+        return false;
     }
 
     // NEW UI Methods (no logic changes)
@@ -259,48 +330,31 @@ export class NewsComponent implements OnInit {
     }
 
     clearAllFilters() {
-        // UI only - placeholder for future logic
         this.selectedCategories.clear();
         this.selectedAssets = [];
         this.searchQuery = '';
-        // Reset all checkbox states (placeholder)
-        console.log('Clear all filters - UI placeholder');
+        this.applyFilters();
     }
 
     savePreset() {
-        // UI only - placeholder for future logic
         console.log('Save preset - UI placeholder');
     }
 
-    // UI Helper Methods for Visual Feedback
     getActiveFilterCount(): number {
-        // Count all active filters (UI only - visual feedback)
         let count = 0;
-
-        // Count selected assets
         count += this.selectedAssets.length;
-
-        // Count article types
         count += Object.values(this.articleTypes).filter(v => v).length;
-
-        // Count events & actions
         count += Object.values(this.corporateActions).filter(v => v).length;
         count += Object.values(this.earningsFinancials).filter(v => v).length;
         count += Object.values(this.guidanceOutlook).filter(v => v).length;
         count += Object.values(this.capitalAllocation).filter(v => v).length;
         count += Object.values(this.legalRegulatory).filter(v => v).length;
-
-        // Count market reaction
         count += Object.values(this.marketReaction).filter(v => v).length;
-
-        // Count analyst actions
         count += Object.values(this.analystActions).filter(v => v).length;
-
-        // Count sectors
         count += Object.values(this.sectors).filter(v => v).length;
-
         return count;
     }
+
 
     getSectionActiveCount(sectionId: string): number {
         // Get count of active filters in a specific section (UI only)

@@ -6,3 +6,6 @@ requests
 httpx
 pytest
 lxml
+feedparser
+beautifulsoup4
+textblob
