@@ -28,6 +28,7 @@ func InitDB() error {
 		sentiment_score REAL,
 		sentiment_label TEXT,
 		tags TEXT,
+		has_full_content BOOLEAN DEFAULT 0,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
 
@@ -67,6 +68,7 @@ func InitDB() error {
 	// MIGRATION: Ensure article_type exists for existing databases
 	// We ignore the error because if the column exists, it will fail, which is fine.
 	_, _ = DB.Exec("ALTER TABLE news_articles ADD COLUMN article_type TEXT")
+	_, _ = DB.Exec("ALTER TABLE news_articles ADD COLUMN has_full_content BOOLEAN DEFAULT 0")
 
 	return DB.Ping()
 }

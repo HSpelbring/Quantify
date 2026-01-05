@@ -483,7 +483,8 @@
                 <div class="article-content">
                     <div class="article-header">
                         <h3 class="article-title">
-                            <a [href]="article.link" target="_blank">{{ article.title }}</a>
+                            <a [href]="article.link" target="_blank"
+                                [class.partial-article]="!article.hasFullContent">{{ article.title }}</a>
                         </h3>
                         <span class="article-source">{{ article.source }} • {{ article.timestamp | date:'shortTime' }} •
                             {{ article.timestamp | date:'longDate' }}</span>

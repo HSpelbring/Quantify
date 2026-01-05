@@ -1,0 +1,37 @@
+{
+    "https://feeds.reuters.com/reuters/businessNews": {
+        "etag": null,
+        "modified": null,
+        "last_fetch": "2026-01-05T17:36:00.068007"
+    },
+    "https://feeds.reuters.com/reuters/marketsNews": {
+        "etag": null,
+        "modified": null,
+        "last_fetch": "2026-01-05T17:36:00.152611"
+    },
+    "https://feeds.reuters.com/reuters/companyNews": {
+        "etag": null,
+        "modified": null,
+        "last_fetch": "2026-01-05T17:36:00.276711"
+    },
+    "https://feeds.reuters.com/reuters/technologyNews": {
+        "etag": null,
+        "modified": null,
+        "last_fetch": "2026-01-05T17:36:00.381967"
+    },
+    "https://www.sec.gov/rss/news/press.xml": {
+        "etag": "\"1767652463\"",
+        "modified": "Mon, 05 Jan 2026 22:34:23 GMT",
+        "last_fetch": "2026-01-05T17:36:01.039814"
+    },
+    "https://www.sec.gov/rss/litigation/litreleases.xml": {
+        "etag": null,
+        "modified": null,
+        "last_fetch": "2026-01-05T17:36:01.830833"
+    },
+    "https://www.sec.gov/rss/enforcement.xml": {
+        "etag": null,
+        "modified": null,
+        "last_fetch": "2026-01-05T17:36:02.892922"
+    }
+}

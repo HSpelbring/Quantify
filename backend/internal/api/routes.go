@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 
 	"github.com/gin-contrib/cors"
@@ -119,17 +120,36 @@ func RegisterRoutes(router *gin.Engine) {
 
 		//  Real News (Cache First)
 		r.GET("/news", func(c *gin.Context) {
-			// Serve from DB instant load
-			articles, err := db.GetRecentArticles(60)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
+			limitStr := c.DefaultQuery("limit", "60")
+			offsetStr := c.DefaultQuery("offset", "0")
+			balanced := c.DefaultQuery("balanced", "true")
+
+			var limit, offset int
+			fmt.Sscanf(limitStr, "%d", &limit)
+			fmt.Sscanf(offsetStr, "%d", &offset)
+
+			if balanced == "true" && offset == 0 {
+				// Serve balanced view (60 per category) for first page
+				articles, err := db.GetRecentArticlesBalanced(limit)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+					return
+				}
+				c.JSON(http.StatusOK, articles)
+			} else {
+				// Standard paginated fetch (most recent first)
+				articles, err := db.GetArticlesByPage(limit, offset)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+					return
+				}
+				c.JSON(http.StatusOK, articles)
 			}
-			c.JSON(http.StatusOK, articles)
 		})
 
 		//  Refresh News (Trigger Pipeline)
 		r.POST("/news/refresh", func(c *gin.Context) {
+			log.Println("[NEWS REFRESH] Starting refresh...")
 			// Trigger Python service to fetch fresh market data
 			// We don't pass symbols anymore, relying on Python's default "Market Pulse" list
 			resp, err := http.Get("http://localhost:8000/news")
@@ -140,24 +160,32 @@ func RegisterRoutes(router *gin.Engine) {
 			}
 			defer resp.Body.Close()
 
+			log.Printf("[NEWS REFRESH] Python responded with status: %d", resp.StatusCode)
+
 			// Read body
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
+				log.Println("[NEWS REFRESH] Failed to read response body:", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read upstream response"})
 				return
 			}
 
+			log.Printf("[NEWS REFRESH] Received %d bytes from Python", len(body))
+
 			// Parse and Save
 			var articles []db.Article
 			if err := json.Unmarshal(body, &articles); err == nil {
+				log.Printf("[NEWS REFRESH] Successfully parsed %d articles", len(articles))
 				if err := db.SaveArticles(articles); err != nil {
 					log.Printf("Failed to save articles: %v", err)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save to DB"})
 					return
 				}
+				log.Printf("[NEWS REFRESH] Successfully saved %d articles to DB", len(articles))
 				c.JSON(http.StatusOK, gin.H{"status": "refreshed", "count": len(articles)})
 			} else {
 				log.Printf("Failed to unmarshal news for saving: %v", err)
+				log.Printf("[NEWS REFRESH] Raw response (first 500 chars): %s", string(body[:int(math.Min(500, float64(len(body))))]))
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid news data"})
 			}
 		})

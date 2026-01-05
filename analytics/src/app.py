@@ -35,6 +35,11 @@ def classify_source_type(provider: str, title: str) -> str:
     p = provider.lower().strip()
     t = title.lower()
 
+    # 0. AUTHORITATIVE RSS REGISTRY MATCH (Priority 1)
+    # Check if the provider is one of our authoritative RSS sources
+    if provider in rss_service.RSS_REGISTRY:
+        return rss_service.RSS_REGISTRY[provider]["article_type"]
+
     # 1. VERIFIED (Official, 1st Party)
     verified_providers = [
         "pr newswire", "business wire", "globenewswire", "accesswire", 
@@ -46,10 +51,11 @@ def classify_source_type(provider: str, title: str) -> str:
     # 2. INSTITUTIONAL (Top Tier Journalism)
     institutional_providers = [
         "reuters", "bloomberg", "wall street journal", "wsj", "financial times", 
-        "cnbc", "associated press", "nikkei asia", "the economist"
+        "cnbc", "associated press", "nikkei asia", "the economist",
+        "investor's business daily", "barron's", "yahoo finance", "nasdaq",
+        "marketwatch", "investing.com", "fortune", "forbes", "market insider"
     ]
     if any(ip in p for ip in institutional_providers):
-        # Edge case: Yahoo reposting Reuters is Institutional
         return "Institutional"
     
     # Check Title for Institutional Sources (e.g. "Reuters: ...")
@@ -61,27 +67,27 @@ def classify_source_type(provider: str, title: str) -> str:
         "upgrade", "downgrade", "initiates coverage", "price target", 
         "reiterates buy", "reiterates sell", "reiterates hold", "rating"
     ]
-    analyst_providers = ["benzinga", "tipranks", "zacks"]
+    # Benzinga and Zacks are heavily analyst-focused
+    analyst_providers = ["benzinga", "tipranks", "zacks", "mt newswires", "thefly", "marketbeat"]
     
     # Check Title Heuristics first for Analyst actions (strong signal)
     if any(k in t for k in analyst_keywords):
         return "Analyst"
         
     if any(ap in p for ap in analyst_providers):
-        # Seeking Alpha Quant/Ratings usually have specific titles, 
-        # but if provider is Benzinga it's 90% analyst/signal news.
         return "Analyst"
 
     # 4. OPINIONATED (Analysis/Persuasion)
     opinion_providers = [
         "motley fool", "seeking alpha", "investorplace", "thestreet", 
-        "barron's", "forbes", "medium"
+        "medium", "gurufocus", "blockspace" # Forbes moved to institutional
     ]
     if any(op in p for op in opinion_providers):
+        print(f"  -> [Opinionated] (matched)")
         return "Opinionated"
 
     # 5. SECONDARY (Aggregators - Default)
-    # yahoo finance, investing.com, msn, marketscreener, google news
+    print(f"  -> Secondary (no match)")
     return "Secondary"
 
 # Initialize NLTK
@@ -113,54 +119,66 @@ def get_market_news(symbols: str = ""):
     # We prioritize RSS for general market news as it's faster and more diverse
     if not targets:
         try:
-            print("Fetching RSS news...")
-            rss_items = rss_service.fetch_rss_news(limit_per_feed=5)
+            print("Fetching Authoritative RSS news...")
+            # Limit increased to 30 per feed to ensure 60 per section buffered
+            rss_items = rss_service.fetch_rss_news(limit_per_feed=30)
             
             for item in rss_items:
-                # AUTO-TAGGING & SENTIMENT
+                # 1. AUTO-TAGGING & SENTIMENT
+                # RSS service now provides summary, which helps tagging accuracy
                 tags = auto_tag_news(item['title'], item['summary'])
                 
-                # Sentiment
-                full_text = f"{item['title']}. {item['summary']}"
-                scores = sia.polarity_scores(full_text)
-                sentiment_score = scores['compound']
-                
-                # Boost logic (reused)
-                has_positive_tag = any(t['category'] == 'Positive' for t in tags)
-                has_negative_tag = any(t['category'] == 'Negative' for t in tags)
-                
-                if has_positive_tag and sentiment_score < 0.2:
-                     sentiment_score = max(sentiment_score + 0.35, 0.25)
-                if has_negative_tag and sentiment_score > -0.2:
-                     sentiment_score = min(sentiment_score - 0.35, -0.25)
-
+                sentiment_score = 0.0
                 sentiment_label = "Neutral"
-                if sentiment_score >= 0.05: sentiment_label = "Positive"
-                elif sentiment_score <= -0.05: sentiment_label = "Negative"
 
-                # Generate ID
-                import hashlib
-                article_id = hashlib.md5(item['link'].encode("utf-8")).hexdigest()
-                
+                if item.get('articleType') != "Verified":
+                    # 2. Sentiment Analysis
+                    full_text = f"{item['title']}. {item['summary']}"
+                    scores = sia.polarity_scores(full_text)
+                    sentiment_score = scores['compound']
+                    
+                    # 3. Sentiment Boost logic
+                    has_positive_tag = any(t['category'] == 'Positive' for t in tags)
+                    has_negative_tag = any(t['category'] == 'Negative' for t in tags)
+                    
+                    if has_positive_tag and sentiment_score < 0.2:
+                         sentiment_score = max(sentiment_score + 0.35, 0.25)
+                    if has_negative_tag and sentiment_score > -0.2:
+                         sentiment_score = min(sentiment_score - 0.35, -0.25)
+
+                    if sentiment_score >= 0.05: sentiment_label = "Positive"
+                    elif sentiment_score <= -0.05: sentiment_label = "Negative"
+
+                # 4. Article Selection
+                article_id = item['id'] # Use the stable hash ID from rss_service
                 if article_id in seen_ids: continue
                 seen_ids.add(article_id)
 
-                # Source Type Classification
-                article_type = classify_source_type(item['source'], item['title'])
+                # 5. Full Content Check
+                # RSS summaries are our primary data source. 
+                # Mark as full unless they clearly end with a snippet indicator.
+                has_full_content = not (item['summary'].endswith("...") or item['summary'].endswith("…"))
+                if len(item['summary']) < 100:
+                    # If it's extremely short, it might just be a headline repeated in summary
+                    # unless it's a very specific brief (like SEC litigation releases)
+                    if article_type != "Verified":
+                         has_full_content = False
 
                 all_news.append({
                     "id": article_id,
                     "title": item['title'],
                     "source": item['source'],
-                    "articleType": article_type,
+                    "articleType": item['articleType'],
                     "timestamp": datetime.fromtimestamp(item['published_raw']).isoformat(),
                     "sentimentScore": sentiment_score,
                     "sentimentLabel": sentiment_label,
                     "tags": tags,
-                    "link": item['link']
+                    "link": item['link'],
+                    "hasFullContent": has_full_content
                 })
         except Exception as e:
-            print(f"RSS Fetch Error: {e}")
+            print(f"Authoritative RSS Fetch Error: {e}")
+            traceback.print_exc()
 
     # 2. YFINANCE (Specific Targets or fallback)
     if not targets:
@@ -173,7 +191,7 @@ def get_market_news(symbols: str = ""):
             ticker = yf.Ticker(sym)
             raw_news = ticker.news
             
-            for item in raw_news[:5]: # Limit YF if mixing
+            for item in raw_news[:20]: # Limit increased from 5 to 20 per symbol
                 # ... (Existing extraction logic, compacted for brevity in replacement)
                 content = item.get("content", item)
                 title = content.get("title", item.get("title", ""))
@@ -223,24 +241,34 @@ def get_market_news(symbols: str = ""):
                 tags = auto_tag_news(title)
                 if not tags: continue # Strict filter
 
-                # Sentiment
-                summary_text = content.get("summary", "")
-                full_text = f"{title}. {summary_text}"
-                scores = sia.polarity_scores(full_text)
-                sentiment_score = scores['compound']
-                
-                # Boost
-                has_positive_tag = any(t['category'] == 'Positive' for t in tags)
-                has_negative_tag = any(t['category'] == 'Negative' for t in tags)
-                if has_positive_tag and sentiment_score < 0.2: sentiment_score = max(sentiment_score + 0.35, 0.25)
-                if has_negative_tag and sentiment_score > -0.2: sentiment_score = min(sentiment_score - 0.35, -0.25)
-
-                sentiment_label = "Neutral"
-                if sentiment_score >= 0.05: sentiment_label = "Positive"
-                elif sentiment_score <= -0.05: sentiment_label = "Negative"
-
                 # Source Categorization
                 article_type = classify_source_type(provider, title)
+
+                # Sentiment
+                sentiment_score = 0.0
+                sentiment_label = "Neutral"
+
+                if article_type != "Verified":
+                    summary_text = content.get("summary", "")
+                    full_text = f"{title}. {summary_text}"
+                    scores = sia.polarity_scores(full_text)
+                    sentiment_score = scores['compound']
+                    
+                    # Boost
+                    has_positive_tag = any(t['category'] == 'Positive' for t in tags)
+                    has_negative_tag = any(t['category'] == 'Negative' for t in tags)
+                    if has_positive_tag and sentiment_score < 0.2: sentiment_score = max(sentiment_score + 0.35, 0.25)
+                    if has_negative_tag and sentiment_score > -0.2: sentiment_score = min(sentiment_score - 0.35, -0.25)
+
+                    if sentiment_score >= 0.05: sentiment_label = "Positive"
+                    elif sentiment_score <= -0.05: sentiment_label = "Negative"
+
+                # Full Content Check
+                # YFinance news items are often snippets.
+                # Mark as partial if it ends with "..." or is very short.
+                has_full_content = not (summary_text.endswith("...") or summary_text.endswith("…"))
+                if len(summary_text) < 200:
+                    has_full_content = False
 
                 all_news.append({
                     "id": article_id,
@@ -251,7 +279,8 @@ def get_market_news(symbols: str = ""):
                     "sentimentScore": sentiment_score,
                     "sentimentLabel": sentiment_label,
                     "tags": tags,
-                    "link": link
+                    "link": link,
+                    "hasFullContent": has_full_content
                 })
 
         except Exception as e:
@@ -260,7 +289,7 @@ def get_market_news(symbols: str = ""):
 
     # Sort
     all_news.sort(key=lambda x: x["timestamp"], reverse=True)
-    return all_news[:50]
+    return all_news[:500] # Increased to 500 to ensure Go backend has enough data for balanced retrieval
 
 # Initialize NLTK
 try:
@@ -302,8 +331,8 @@ FINANCIAL_LEXICON = {
 }
 sia.lexicon.update(FINANCIAL_LEXICON)
 
-app = FastAPI()
-app.add_middleware(CORSMiddleware, allow_origins=["*"])
+# FastAPI app instance is defined and configured with CORS near line 19.
+# The previous redundant definition here has been removed to avoid route shadowing.
 
 # -------------------------------
 # QUOTE CACHE (10-second TTL)
@@ -709,173 +738,92 @@ def is_relevant_news(title: str) -> bool:
         
     return True
 
-@app.get("/news")
-def get_market_news(symbols: str = ""):
-    """
-    Fetch news for a comma-separated list of symbols.
-    If empty, fetches general market news via a default list.
-    """
-    targets = [s.strip().upper() for s in symbols.split(",") if s.strip()]
-    
-    # Default "Market Pulse" list if no specific symbols provided
-    # Covers: Indices, Tech, Finance, Energy, Crypto, volatility
-    if not targets:
-        targets = [
-            # Indices
-            "SPY", "QQQ", "DIA", "IWM", "^VIX",
-            # Mag 7 / Tech Leaders
-            "NVDA", "AAPL", "MSFT", "TSLA", "AMZN", "GOOG", "META", "AMD",
-            # Sectors / Economy
-            "JPM", "GS",   # Finance
-            "XLE", "CVX",  # Energy
-            "LLY", "JNJ",  # Healthcare
-            "BTC-USD"      # Crypto
-        ]
-    
-    all_news = []
-    seen_titles = set()
-
-    for sym in targets:
-        try:
-            ticker = yf.Ticker(sym)
-            raw_news = ticker.news
-            
-            # specific limit increased to allow for better aggregation
-            for item in raw_news[:15]:
-                # Handle nested 'content' structure if present (yfinance update)
-                content = item.get("content", item) 
-                
-                title = content.get("title", item.get("title", ""))
-                if title in seen_titles:
-                    continue
-
-                # Filter out junk/noise
-                if not is_relevant_news(title):
-                    continue
-
-                seen_titles.add(title)
-                
-                # Extract provider/publisher
-                # structure varies: might be 'provider': {'displayName': '...'} or just 'publisher' string
-                provider = "Yahoo Finance"
-                if "provider" in content:
-                    prov_data = content["provider"]
-                    if isinstance(prov_data, dict):
-                        provider = prov_data.get("displayName", "Yahoo Finance")
-                    else:
-                        provider = str(prov_data)
-                elif "publisher" in content:
-                    provider = content["publisher"]
-
-                # Extract link (Safe Handling of dict vs string)
-                raw_link = content.get("canonicalUrl") or content.get("link") or content.get("clickThroughUrl")
-                link = ""
-                
-                if isinstance(raw_link, dict):
-                     link = str(raw_link.get("url", ""))
-                elif isinstance(raw_link, str):
-                     link = str(raw_link)
-                
-                # Extract timestamp (Parse pubDate which is ISO string)
-                pub_date_str = content.get("pubDate")
-                pub_time_raw = 0.0
-                display_time = ""
-
-                if pub_date_str:
-                    try:
-                        # Parse ISO string "2023-12-15T14:30:00Z"
-                        # fromisoformat requires +00:00 instead of Z in older python, but safer to replace
-                        dt = datetime.fromisoformat(pub_date_str.replace("Z", "+00:00"))
-                        pub_time_raw = dt.timestamp()
-                        display_time = pub_date_str
-                    except Exception as e:
-                        print(f"Date parse error: {e}")
-                        pub_time_raw = time.time()
-                        display_time = datetime.fromtimestamp(pub_time_raw).isoformat()
-                else:
-                    # Fallback if no pubDate
-                    pub_time_raw = item.get("providerPublishTime", time.time())
-                    display_time = datetime.fromtimestamp(pub_time_raw).isoformat()
+#                         pub_time_raw = time.time()
+#                         display_time = datetime.fromtimestamp(pub_time_raw).isoformat()
+#                 else:
+#                     # Fallback if no pubDate
+#                     pub_time_raw = item.get("providerPublishTime", time.time())
+#                     display_time = datetime.fromtimestamp(pub_time_raw).isoformat()
 
 
-                # Auto-Tagging
-                # We NO LONGER blindly add the queried symbol. 
-                # Strict Whitelist Mode: Article must explicitly mention a known entity in Title/Text.
-                tags = auto_tag_news(title)
+#                 # Auto-Tagging
+#                 # We NO LONGER blindly add the queried symbol. 
+#                 # Strict Whitelist Mode: Article must explicitly mention a known entity in Title/Text.
+#                 tags = auto_tag_news(title)
                 
-                # Check if any tags were found (Entity, Sector, Corporate, Sentiment)
-                # Relaxed from strict Entity-Only check to allow "Market Pulse" news
-                if not tags:
-                    # Drop article if it has zero relevance tags
-                    continue
+#                 # Check if any tags were found (Entity, Sector, Corporate, Sentiment)
+#                 # Relaxed from strict Entity-Only check to allow "Market Pulse" news
+#                 if not tags:
+#                     # Drop article if it has zero relevance tags
+#                     continue
                 
-                # If we kept it, we can optionally add the queried 'sym' if it wasn't found but we trust the source?
-                # User said "reverse system... if stock... included". Strict is safer.
-                # But what if "iPhone sales up" (implies AAPL)? My map has "apple".
-                # If I want to be safe, I rely on the map.
+#                 # If we kept it, we can optionally add the queried 'sym' if it wasn't found but we trust the source?
+#                 # User said "reverse system... if stock... included". Strict is safer.
+#                 # But what if "iPhone sales up" (implies AAPL)? My map has "apple".
+#                 # If I want to be safe, I rely on the map.
                 
-                # Sentiment Analysis
-                sentiment_score = 0.0
-                sentiment_label = "Neutral"
+#                 # Sentiment Analysis
+#                 sentiment_score = 0.0
+#                 sentiment_label = "Neutral"
                 
-                try:
-                    # Use Title + Summary for better signal/context
-                    summary_text = content.get("summary", "")
-                    full_text = f"{title}. {summary_text}"
+#                 try:
+#                     # Use Title + Summary for better signal/context
+#                     summary_text = content.get("summary", "")
+#                     full_text = f"{title}. {summary_text}"
                     
-                    scores = sia.polarity_scores(full_text)
-                    sentiment_score = scores['compound']
+#                     scores = sia.polarity_scores(full_text)
+#                     sentiment_score = scores['compound']
                     
-                    # --- SCORE BOOSTING FROM TAGS ---
-                    # If we already identified specific positive/negative tags, force the score to align.
-                    # This fixes "0.0" scores for articles like "XRP Price Drops" where VADER might miss it.
+#                     # --- SCORE BOOSTING FROM TAGS ---
+#                     # If we already identified specific positive/negative tags, force the score to align.
+#                     # This fixes "0.0" scores for articles like "XRP Price Drops" where VADER might miss it.
                     
-                    has_positive_tag = any(t['category'] == 'Positive' for t in tags)
-                    has_negative_tag = any(t['category'] == 'Negative' for t in tags)
+#                     has_positive_tag = any(t['category'] == 'Positive' for t in tags)
+#                     has_negative_tag = any(t['category'] == 'Negative' for t in tags)
                     
-                    if has_positive_tag and sentiment_score < 0.2:
-                         sentiment_score = max(sentiment_score + 0.35, 0.25)
+#                     if has_positive_tag and sentiment_score < 0.2:
+#                          sentiment_score = max(sentiment_score + 0.35, 0.25)
                          
-                    if has_negative_tag and sentiment_score > -0.2:
-                         sentiment_score = min(sentiment_score - 0.35, -0.25)
+#                     if has_negative_tag and sentiment_score > -0.2:
+#                          sentiment_score = min(sentiment_score - 0.35, -0.25)
 
-                    if sentiment_score >= 0.05:
-                        sentiment_label = "Positive"
-                        tags = [t for t in tags if t['category'] != 'Negative']
-                    elif sentiment_score <= -0.05:
-                        sentiment_label = "Negative"
-                        tags = [t for t in tags if t['category'] != 'Positive']
-                except Exception:
-                    pass
+#                     if sentiment_score >= 0.05:
+#                         sentiment_label = "Positive"
+#                         tags = [t for t in tags if t['category'] != 'Negative']
+#                     elif sentiment_score <= -0.05:
+#                         sentiment_label = "Negative"
+#                         tags = [t for t in tags if t['category'] != 'Positive']
+#                 except Exception:
+#                     pass
 
-                # Stable ID Generation
-                # Use upstream ID if available. If not, generate hash from Title to prevent duplicates.
-                article_id = item.get("id", item.get("uuid"))
-                if not article_id:
-                    import hashlib
-                    # create deterministic hash of title
-                    article_id = hashlib.md5(title.encode("utf-8")).hexdigest()
+#                 # Stable ID Generation
+#                 # Use upstream ID if available. If not, generate hash from Title to prevent duplicates.
+#                 article_id = item.get("id", item.get("uuid"))
+#                 if not article_id:
+#                     import hashlib
+#                     # create deterministic hash of title
+#                     article_id = hashlib.md5(title.encode("utf-8")).hexdigest()
 
-                all_news.append({
-                    "id": article_id,
-                    "title": title,
-                    "source": provider,
-                    "timestamp": display_time, 
-                    "sentimentScore": sentiment_score,
-                    "sentimentLabel": sentiment_label,
-                    "tags": tags,
-                    "link": link
-                })
-        except Exception as e:
-            print(f"Error fetching news for {sym}: {e}")
-            continue
+#                 all_news.append({
+#                     "id": article_id,
+#                     "title": title,
+#                     "source": provider,
+#                     "timestamp": display_time, 
+#                     "sentimentScore": sentiment_score,
+#                     "sentimentLabel": sentiment_label,
+#                     "tags": tags,
+#                     "link": link
+#                 })
+#         except Exception as e:
+#             print(f"Error fetching news for {sym}: {e}")
+#             continue
 
-    # Sort by Most Recent (ISO strings sort correctly)
-    all_news.sort(key=lambda x: x["timestamp"], reverse=True)
+#     # Sort by Most Recent (ISO strings sort correctly)
+#     all_news.sort(key=lambda x: x["timestamp"], reverse=True)
     
-    # Global Limit: 50
-    return all_news[:50]
-
+#     # Global Limit: 50
+#     return all_news[:50]
+# """
 
 @app.get("/price/{symbol}")
 def get_price(symbol: str):

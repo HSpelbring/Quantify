@@ -34,6 +34,7 @@ export interface Article {
     sentimentLabel: 'Positive' | 'Negative' | 'Neutral';
     tags: NewsTag[];
     link: string;
+    hasFullContent?: boolean;
 }
 
 @Component({
@@ -63,9 +64,9 @@ export class NewsComponent implements OnInit {
     articleTypes = {
         verified: true,
         institutional: true,
-        analyst: false,
+        analyst: true,
         secondary: false,
-        opinionated: false
+        opinionated: true
     };
 
     // Events & Actions (UI only)

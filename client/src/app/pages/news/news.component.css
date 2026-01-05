@@ -646,6 +646,10 @@
     transition: color 0.2s;
 }
 
+.article-title a.partial-article {
+    color: #888;
+}
+
 .article-title a:hover {
     color: #4fc3f7;
     text-decoration: underline;
