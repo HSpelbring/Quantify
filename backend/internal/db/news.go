@@ -18,6 +18,7 @@ type Article struct {
 	SentimentLabel string  `json:"sentimentLabel"`
 	Tags           any     `json:"tags"` // JSON array or struct, kept as any for flexible encoding
 	Link           string  `json:"link"` // url
+	HasFullContent bool    `json:"hasFullContent"`
 }
 
 // SaveArticles inserts new articles into the database
@@ -31,15 +32,16 @@ func SaveArticles(articles []Article) error {
 	// Ensure article_type column exists (idempotent check not easy here freely, relying on migration or previous Exec)
 
 	stmt, err := tx.Prepare(`
-		INSERT INTO news_articles (id, title, source, article_type, url, published_at, sentiment_score, sentiment_label, tags)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO news_articles (id, title, source, article_type, url, published_at, sentiment_score, sentiment_label, tags, has_full_content)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			tags = excluded.tags,
 			sentiment_score = excluded.sentiment_score,
 			sentiment_label = excluded.sentiment_label,
 			article_type = excluded.article_type,
 			title = excluded.title,
-			url = excluded.url
+			url = excluded.url,
+			has_full_content = excluded.has_full_content
 	`)
 	if err != nil {
 		return err
@@ -60,6 +62,7 @@ func SaveArticles(articles []Article) error {
 			a.SentimentScore,
 			a.SentimentLabel,
 			string(tagsJSON),
+			a.HasFullContent,
 		)
 		if err != nil {
 			log.Printf("Error inserting/updating article %s: %v", a.Title, err)
@@ -84,7 +87,7 @@ func SearchNews(query string, limit int) ([]Article, error) {
 	// Common pattern: SELECT * FROM news_articles WHERE rowid IN (SELECT rowid FROM news_fts WHERE news_fts MATCH ?)
 
 	rows, err := DB.Query(`
-		SELECT id, title, source, article_type, url, published_at, sentiment_score, sentiment_label, tags 
+		SELECT id, title, source, article_type, url, published_at, sentiment_score, sentiment_label, tags, has_full_content
 		FROM news_articles 
 		WHERE rowid IN (
 			SELECT rowid FROM news_fts WHERE news_fts MATCH ? ORDER BY rank
@@ -111,6 +114,7 @@ func SearchNews(query string, limit int) ([]Article, error) {
 			&a.SentimentScore,
 			&a.SentimentLabel,
 			&tagsStr,
+			&a.HasFullContent,
 		)
 		if err != nil {
 			log.Println("Error scanning row:", err)
@@ -128,14 +132,46 @@ func SearchNews(query string, limit int) ([]Article, error) {
 	return results, nil
 }
 
-// GetRecentArticles fetches the latest N articles from the DB
-func GetRecentArticles(limit int) ([]Article, error) {
+// GetRecentArticlesBalanced fetches up to quota articles for EACH type to ensure balanced display.
+func GetRecentArticlesBalanced(quota int) ([]Article, error) {
+	types := []string{"Verified", "Institutional", "Analyst", "Opinionated", "Secondary"}
+	var allResults []Article
+
+	for _, t := range types {
+		rows, err := DB.Query(`
+			SELECT id, title, source, article_type, url, published_at, sentiment_score, sentiment_label, tags, has_full_content
+			FROM news_articles
+			WHERE article_type = ?
+			ORDER BY published_at DESC
+			LIMIT ?
+		`, t, quota)
+		if err != nil {
+			log.Printf("Error fetching balanced news for type %s: %v", t, err)
+			continue
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var a Article
+			var tagsStr string
+			err := rows.Scan(&a.ID, &a.Title, &a.Source, &a.ArticleType, &a.Link, &a.Timestamp, &a.SentimentScore, &a.SentimentLabel, &tagsStr, &a.HasFullContent)
+			if err == nil {
+				json.Unmarshal([]byte(tagsStr), &a.Tags)
+				allResults = append(allResults, a)
+			}
+		}
+	}
+	return allResults, nil
+}
+
+// GetArticlesByPage support pagination (limit/offset)
+func GetArticlesByPage(limit, offset int) ([]Article, error) {
 	rows, err := DB.Query(`
-		SELECT id, title, source, article_type, url, published_at, sentiment_score, sentiment_label, tags
+		SELECT id, title, source, article_type, url, published_at, sentiment_score, sentiment_label, tags, has_full_content
 		FROM news_articles
 		ORDER BY published_at DESC
-		LIMIT ?
-	`, limit)
+		LIMIT ? OFFSET ?
+	`, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -145,27 +181,16 @@ func GetRecentArticles(limit int) ([]Article, error) {
 	for rows.Next() {
 		var a Article
 		var tagsStr string
-		err := rows.Scan(
-			&a.ID,
-			&a.Title,
-			&a.Source,
-			&a.ArticleType,
-			&a.Link,
-			&a.Timestamp,
-			&a.SentimentScore,
-			&a.SentimentLabel,
-			&tagsStr,
-		)
-		if err != nil {
-			log.Println("Error scanning row:", err)
-			continue
+		err := rows.Scan(&a.ID, &a.Title, &a.Source, &a.ArticleType, &a.Link, &a.Timestamp, &a.SentimentScore, &a.SentimentLabel, &tagsStr, &a.HasFullContent)
+		if err == nil {
+			json.Unmarshal([]byte(tagsStr), &a.Tags)
+			results = append(results, a)
 		}
-
-		// Unmarshal tags
-		if err := json.Unmarshal([]byte(tagsStr), &a.Tags); err != nil {
-			a.Tags = []interface{}{}
-		}
-		results = append(results, a)
 	}
 	return results, nil
+}
+
+// GetRecentArticles fetches the latest N articles from the DB (kept for compatibility)
+func GetRecentArticles(limit int) ([]Article, error) {
+	return GetArticlesByPage(limit, 0)
 }
