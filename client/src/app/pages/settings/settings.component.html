@@ -56,6 +56,38 @@
       </div>
     </div>
 
+    <!-- TICKER CONFIG CARD -->
+    <div class="settings-card">
+      <h2>📊 Ticker Instruments</h2>
+      <p style="color: #888; font-size: 13px; margin-bottom: 15px;">
+        Select instruments to display in the bottom ticker (min 6).
+      </p>
+
+      <div class="ticker-grid"
+        style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 20px;">
+        <div *ngFor="let cat of categories">
+          <h4 style="color: #bbb; margin-bottom: 8px; border-bottom: 1px solid #444; padding-bottom: 4px;">{{ cat }}
+          </h4>
+          <div *ngFor="let inst of getInstrumentsByCategory(cat)" style="margin-bottom: 6px;">
+            <label style="display: flex; align-items: center; cursor: pointer; font-size: 13px;">
+              <input type="checkbox" [checked]="isTickerSelected(inst.symbol)" (change)="toggleTicker(inst.symbol)"
+                style="margin-right: 8px; accent-color: #4CAF50;">
+              {{ inst.name }}
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; display: flex; align-items: center; justify-content: space-between;">
+        <span style="color: #ff5252; font-size: 13px;" *ngIf="tickerSaveError">
+          ⚠️ {{ tickerSaveError }}
+        </span>
+        <button class="btn-primary" (click)="saveTickerSettings()" [disabled]="tickerSaveError !== ''">
+          Save Selection
+        </button>
+      </div>
+    </div>
+
     <!-- PREFERENCES CARD -->
     <div class="settings-card">
       <h2>🎨 Preferences</h2>

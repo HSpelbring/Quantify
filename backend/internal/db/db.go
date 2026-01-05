@@ -35,7 +35,7 @@ func InitDB() error {
 	-- Note: modernc.org/sqlite usually supports FTS5. If this fails, we will need to fallback or ignore.
 	CREATE VIRTUAL TABLE IF NOT EXISTS news_fts USING fts5(title, source, tags, content='news_articles', content_rowid='rowid');
 
-	-- Trigger to keep FTS in sync on INSERT
+	-- Trigger to keep FTS in sync o8n INSERT
 	CREATE TRIGGER IF NOT EXISTS news_ai AFTER INSERT ON news_articles BEGIN
 	  INSERT INTO news_fts(rowid, title, source, tags) VALUES (new.rowid, new.title, new.source, new.tags);
 	END;

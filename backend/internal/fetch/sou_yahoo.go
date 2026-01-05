@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 type PriceResponse struct {
@@ -73,10 +74,15 @@ type QuoteResponse struct {
 	History []float64 `json:"history"`
 }
 
-func FetchYahooBulk() (map[string]models.Fund, error) {
+func FetchYahooBulk(symbols []string) (map[string]models.Fund, error) {
 	results := make(map[string]models.Fund)
 
-	resp, err := http.Get("http://localhost:8000/quotes")
+	url := "http://localhost:8000/quotes"
+	if len(symbols) > 0 {
+		url += "?symbols=" + strings.Join(symbols, ",")
+	}
+
+	resp, err := http.Get(url)
 	if err != nil {
 		return results, err
 	}

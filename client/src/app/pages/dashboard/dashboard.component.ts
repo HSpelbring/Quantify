@@ -1,7 +1,9 @@
 import { Component, AfterViewInit, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
 import { Chart } from 'chart.js/auto';
-import { NgFor, CurrencyPipe } from '@angular/common';
+import { NgFor, NgClass, CurrencyPipe } from '@angular/common';
 import { FundService } from '../../services/fund.service';
+import { TickerSettingsService } from '../../services/ticker-settings.service';
 
 interface Fund {
   symbol: string;
@@ -12,10 +14,16 @@ interface Fund {
   history: number[];   // ✅ REAL intraday sparkline data
 }
 
+interface Signal {
+  text: string;
+  type: 'neutral' | 'bullish' | 'bearish' | 'warning';
+  route: string;
+}
+
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [NgFor, CurrencyPipe],
+  imports: [NgFor, NgClass, CurrencyPipe],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.css']
 })
@@ -24,10 +32,23 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   charts: Chart[] = [];
   portfolio: any = { price: 0, change: 0 };
 
-  constructor(private fundService: FundService) { }
+  // Mock Data for Today's Signals
+  signals: Signal[] = [
+    { text: '4 insider buys flagged (2 high conviction)', type: 'bullish', route: '/insights' },
+    { text: 'Analyst downgrades clustering in Semiconductors', type: 'bearish', route: '/news' },
+    { text: 'Earnings reactions diverging from guidance trend', type: 'warning', route: '/insights' },
+    { text: 'Volatility rising without index drawdown', type: 'neutral', route: '/insights' }
+  ];
+
+  constructor(
+    private fundService: FundService,
+    private tickerSettings: TickerSettingsService,
+    private router: Router
+  ) { }
 
   ngOnInit(): void {
-    this.fundService.getFunds().subscribe((data: any) => {
+    const symbols = this.tickerSettings.getSelectedSymbols();
+    this.fundService.getFunds(symbols).subscribe((data: any) => {
       this.funds = data;
 
       this.portfolio.price = this.funds.reduce((a: number, f: Fund) => a + f.price, 0);
@@ -99,6 +120,12 @@ export class DashboardComponent implements OnInit, AfterViewInit {
         this.charts.push(chart);
       });
     }
+  }
+
+  onSignalClick(signal: Signal) {
+    // Navigate with pre-applied filter logic if needed in future
+    console.log(`Navigating to ${signal.route} for signal: ${signal.text}`);
+    this.router.navigate([signal.route]);
   }
 
   private destroyCharts(): void {

@@ -63,11 +63,8 @@ func FetchFund(symbol string) (models.Fund, error) {
 	// -------------------------------
 	// 4. NAME RESOLUTION
 	// -------------------------------
-	for _, t := range tracked {
-		if t.Symbol == symbol {
-			fd.Name = t.Name
-			break
-		}
+	if name, ok := KnownInstruments[symbol]; ok {
+		fd.Name = name
 	}
 
 	if fd.Symbol == "" {

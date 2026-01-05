@@ -14,6 +14,17 @@
 
       <canvas id="portfolioChart"></canvas>
     </div>
+
+    <!-- Today's Signals -->
+    <div class="signals-box box">
+      <h2>Today's Signals</h2>
+      <div class="signal-list">
+        <div class="signal-row" *ngFor="let signal of signals" (click)="onSignalClick(signal)">
+          <div class="signal-indicator" [ngClass]="signal.type"></div>
+          <span class="signal-text">{{ signal.text }}</span>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="fund-ticker">

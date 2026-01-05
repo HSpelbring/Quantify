@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, shareReplay, catchError, of, tap } from 'rxjs';
 
 @Injectable({
@@ -12,18 +12,25 @@ export class FundService {
 
   constructor(private http: HttpClient) { }
 
-  getFunds(): Observable<any> {
+  getFunds(symbols?: string[]): Observable<any> {
     const now = Date.now();
     const expired = now - this.lastFetch > this.cacheTime;
 
-    // ✅ Reuse cached observable if still valid
-    if (this.fundsCache$ && !expired) {
+    // Only use cache if no custom symbols requested (simplified caching strategy)
+    // If symbols are requested, we always fetch fresh to ensure we get the right ones.
+    if (!symbols && this.fundsCache$ && !expired) {
       return this.fundsCache$;
     }
 
-    console.log('⏳ Fetching new funds from backend...');
+    console.log('⏳ Fetching funds from backend...');
     this.lastFetch = now;
-    this.fundsCache$ = this.http.get('/api/funds').pipe(
+
+    let params = new HttpParams();
+    if (symbols && symbols.length > 0) {
+      params = params.set('symbols', symbols.join(','));
+    }
+
+    const obs$ = this.http.get('/api/funds', { params }).pipe(
       tap(() => console.log('✅ Data received from /api/funds')),
       shareReplay(1),
       catchError(err => {
@@ -32,7 +39,11 @@ export class FundService {
       })
     );
 
-    return this.fundsCache$;
+    if (!symbols) {
+      this.fundsCache$ = obs$;
+    }
+
+    return obs$;
   }
 
   getStockDetails(symbol: string): Observable<any> {

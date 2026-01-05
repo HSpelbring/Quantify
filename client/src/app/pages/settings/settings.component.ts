@@ -1,6 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common'; // Import CommonModule for NgIf, NgFor etc.
 import { FormsModule } from '@angular/forms';
+import { TickerSettingsService } from '../../services/ticker-settings.service';
+import { TICKER_INSTRUMENTS, TickerInstrument } from '../../config/ticker.config';
 
 @Component({
   selector: 'app-settings',
@@ -28,10 +30,21 @@ export class SettingsComponent implements OnInit {
     animations: true
   };
 
+  // Ticker Configuration
+  availableInstruments = TICKER_INSTRUMENTS;
+  selectedTickerSymbols: Set<string> = new Set();
+  tickerSaveError = '';
+
+  // Computed Categories for UI
+  categories = ['Indices', 'Commodities', 'FX', 'Rates', 'Volatility', 'Crypto'];
+
+  constructor(private tickerService: TickerSettingsService) { }
+
   ngOnInit() {
     this.loadSettings();
     this.checkSystemStatus();
     this.calculateCacheSize();
+    this.loadTickerSettings();
   }
 
   loadSettings() {
@@ -43,6 +56,48 @@ export class SettingsComponent implements OnInit {
     const savedPrefs = localStorage.getItem('quantify_prefs');
     if (savedPrefs) {
       this.preferences = JSON.parse(savedPrefs);
+    }
+  }
+
+  loadTickerSettings() {
+    const saved = this.tickerService.getSelectedSymbols();
+    this.selectedTickerSymbols = new Set(saved);
+  }
+
+  getInstrumentsByCategory(cat: string): TickerInstrument[] {
+    return this.availableInstruments.filter(i => i.category === cat);
+  }
+
+  isTickerSelected(symbol: string): boolean {
+    return this.selectedTickerSymbols.has(symbol);
+  }
+
+  toggleTicker(symbol: string) {
+    if (this.selectedTickerSymbols.has(symbol)) {
+      this.selectedTickerSymbols.delete(symbol);
+    } else {
+      this.selectedTickerSymbols.add(symbol);
+    }
+    this.validateTickerSettings();
+  }
+
+  validateTickerSettings(): boolean {
+    if (this.selectedTickerSymbols.size < this.tickerService.getMinSelectionCount()) {
+      this.tickerSaveError = `Minimum ${this.tickerService.getMinSelectionCount()} instruments required.`;
+      return false;
+    }
+    this.tickerSaveError = '';
+    return true;
+  }
+
+  saveTickerSettings() {
+    if (!this.validateTickerSettings()) return;
+
+    try {
+      this.tickerService.saveSelectedSymbols(Array.from(this.selectedTickerSymbols));
+      alert('Ticker settings saved! Refresh dashboard to see changes.');
+    } catch (e) {
+      alert(e);
     }
   }
 
@@ -85,6 +140,7 @@ export class SettingsComponent implements OnInit {
       localStorage.removeItem('quantify_portfolio');
       localStorage.removeItem('quantify_api_keys');
       localStorage.removeItem('quantify_prefs');
+      localStorage.removeItem('quantify_ticker_settings');
       location.reload();
     }
   }
