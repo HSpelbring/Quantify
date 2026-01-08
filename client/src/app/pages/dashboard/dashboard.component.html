@@ -1,4 +1,14 @@
 <div class="dashboard">
+  <!-- Notification Banner -->
+  <div class="notification-banner" *ngIf="notifications.length > 0">
+    <div *ngFor="let note of notifications" class="banner-item">
+      <div class="banner-content">
+        <span class="banner-icon">🔔</span>
+        <span class="banner-message">{{ note.message }}</span>
+      </div>
+      <button class="banner-close" (click)="dismissNotification(note.id)">✕</button>
+    </div>
+  </div>
 
   <!-- Right-side stack -->
   <div class="right-side">

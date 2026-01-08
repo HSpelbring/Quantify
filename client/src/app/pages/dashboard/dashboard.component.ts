@@ -1,7 +1,7 @@
 import { Component, AfterViewInit, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { Chart } from 'chart.js/auto';
-import { NgFor, NgClass, CurrencyPipe } from '@angular/common';
+import { NgFor, NgClass, NgIf, CurrencyPipe } from '@angular/common';
 import { FundService } from '../../services/fund.service';
 import { TickerSettingsService } from '../../services/ticker-settings.service';
 
@@ -23,7 +23,7 @@ interface Signal {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [NgFor, NgClass, CurrencyPipe],
+  imports: [NgFor, NgClass, NgIf, CurrencyPipe],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.css']
 })
@@ -31,6 +31,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   funds: Fund[] = [];
   charts: Chart[] = [];
   portfolio: any = { price: 0, change: 0 };
+  notifications: any[] = [];
 
   // Mock Data for Today's Signals
   signals: Signal[] = [
@@ -56,6 +57,8 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
       setTimeout(() => this.initializeCharts(), 50);
     });
+
+    this.loadNotifications();
   }
 
   ngAfterViewInit(): void {
@@ -131,5 +134,26 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   private destroyCharts(): void {
     this.charts.forEach(chart => chart.destroy());
     this.charts = [];
+  }
+
+  loadNotifications() {
+    fetch('http://localhost:8080/api/notifications')
+      .then(res => res.json())
+      .then(data => {
+        const dismissed = JSON.parse(localStorage.getItem('quantify_dismissed_notifications') || '[]');
+        this.notifications = data.filter((n: any) => !dismissed.includes(n.id));
+      })
+      .catch(err => console.error('Error loading notifications:', err));
+  }
+
+  dismissNotification(id: string) {
+    fetch(`http://localhost:8080/api/notifications/${id}/dismiss`, { method: 'POST' })
+      .catch(err => console.error('Error dismissing notification in backend:', err));
+
+    const dismissed = JSON.parse(localStorage.getItem('quantify_dismissed_notifications') || '[]');
+    dismissed.push(id);
+    localStorage.setItem('quantify_dismissed_notifications', JSON.stringify(dismissed));
+
+    this.notifications = this.notifications.filter(n => n.id !== id);
   }
 }

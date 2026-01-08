@@ -16,12 +16,19 @@ export type TagCategory =
     | 'Guidance'    // Pink
     | 'Corporate'   // (Legacy/Fallback)
     | 'Analyst'     // Yellow
+    | 'Corporate Actions'
+    | 'Earnings & Financial Results'
+    | 'Guidance & Outlook'
+    | 'Capital Allocation'
+    | 'Legal & Regulatory'
     | 'Legal';      // Dark Red
 
 export interface NewsTag {
     label: string;
-    category: TagCategory;
-    selected?: boolean; // For filtering UI
+    filter_name?: string;
+    tag?: string;
+    category: TagCategory | string;
+    selected?: boolean;
 }
 
 export interface Article {
@@ -54,13 +61,13 @@ export class NewsComponent implements OnInit {
     selectedCategories: Set<TagCategory> = new Set();
     sortOption: 'recent' | 'bullish' | 'bearish' = 'recent';
 
-    // NEW UI State (visual only, no logic changes)
+    // Unified Filter State
+    activeFilters: { [key: string]: boolean } = {};
     searchQuery = '';
     selectedAssets: string[] = [];
     assetMatchMode: 'any' | 'all' = 'any';
-    expandedSections = new Set<string>(['articles-included']); // Default open
+    expandedSections = new Set<string>(['articles-included']);
 
-    // Articles Included (UI only)
     articleTypes = {
         verified: true,
         institutional: true,
@@ -69,62 +76,12 @@ export class NewsComponent implements OnInit {
         opinionated: true
     };
 
-    // Events & Actions (UI only)
-    corporateActions = {
-        mergerAnnounced: false,
-        acquisition: false,
-        buyout: false,
-        spinOff: false,
-        divestiture: false,
-        ipo: false,
-        delisting: false,
-        management: false
-    };
-
-    earningsFinancials = {
-        earningsBeat: false,
-        earningsMiss: false,
-        earningsInline: false,
-        revenueGrowth: false,
-        revenueDecline: false,
-        marginExpansion: false,
-        marginCompression: false
-    };
-
-    guidanceOutlook = {
-        guidanceRaised: false,
-        guidanceCut: false,
-        guidanceIssued: false,
-        forecastChange: false
-    };
-
-    capitalAllocation = {
-        dividendDeclared: false,
-        dividendIncrease: false,
-        dividendCut: false,
-        shareBuyback: false,
-        debtIssuance: false,
-        debtReduction: false
-    };
-
-    legalRegulatory = {
-        secFiling: false,
-        secInvestigation: false,
-        lawsuit: false,
-        settlement: false,
-        antitrustAction: false,
-        regulatoryApproval: false,
-        regulatoryRejection: false
-    };
-
-    // Market Reaction & Sentiment (UI only)
     marketReaction = {
         bullish: false,
         bearish: false,
         mixed: false
     };
 
-    // Analyst Actions (UI only)
     analystActions = {
         ratingUpgrade: false,
         ratingDowngrade: false,
@@ -134,10 +91,7 @@ export class NewsComponent implements OnInit {
         coverageDropped: false
     };
 
-    // Sector & Industry (UI only)
-    sectorSearch = '';
-    sectorMatchMode: 'any' | 'all' = 'any';
-    sectors = {
+    sectors: { [key: string]: boolean } = {
         technology: false,
         energy: false,
         healthcare: false,
@@ -148,20 +102,94 @@ export class NewsComponent implements OnInit {
         biotech: false
     };
 
-    // Time Range & Asset Scope (UI only)
     timeRange: 'today' | 'last24h' | 'thisWeek' | 'custom' = 'today';
     assetScope: 'any' | 'single' | 'multiple' | 'etf' | 'crypto' = 'any';
-
-    // Filter Logic (UI only)
     filterLogicMode: 'all' | 'any' = 'any';
 
-    // Available filters (extracted from data or hardcoded)
+    // Filter Categories for the template
+    filterCategories = [
+        { id: 'corporate-actions', name: 'Corporate Actions', accent: '#007bff', colorClass: 'category-blue' },
+        { id: 'earnings-financials', name: 'Earnings & Financial Results', accent: '#28a745', colorClass: 'category-green' },
+        { id: 'guidance-outlook', name: 'Guidance & Outlook', accent: '#ffc107', colorClass: 'category-yellow' },
+        { id: 'capital-allocation', name: 'Capital Allocation', accent: '#fd7e14', colorClass: 'category-orange' },
+        { id: 'legal-regulatory', name: 'Legal & Regulatory', accent: '#dc3545', colorClass: 'category-red' }
+    ];
+
+    // Filter Groups (Legacy/Top-level)
     filterGroups = [
         { name: 'Asset Class', categories: ['Stock', 'Fund', 'Crypto'] as TagCategory[] },
-        { name: 'Corporate Events', categories: ['Merger', 'Dividend', 'Management', 'Guidance'] as TagCategory[] },
         { name: 'Market Sentiment', categories: ['Positive', 'Negative', 'Analyst'] as TagCategory[] },
         { name: 'Sectors & Macro', categories: ['Sector'] as TagCategory[] },
         { name: 'Legal', categories: ['Legal'] as TagCategory[] }
+    ];
+
+    // Mock/Config for Events (In a real app, this might come from an API or shared constant)
+    eventTags: { filter_name: string, tag: string, category: string }[] = [
+        // This should match tagging_config.py
+        { "filter_name": "Merger Announced", "tag": "Merger", "category": "Corporate Actions" },
+        { "filter_name": "Acquisition Announced", "tag": "Acquisition", "category": "Corporate Actions" },
+        { "filter_name": "Buyout / Takeover", "tag": "Buyout", "category": "Corporate Actions" },
+        { "filter_name": "Spin-Off Announced", "tag": "Spin-Off", "category": "Corporate Actions" },
+        { "filter_name": "Divestiture / Asset Sale", "tag": "Divestiture", "category": "Corporate Actions" },
+        { "filter_name": "IPO Announced", "tag": "IPO", "category": "Corporate Actions" },
+        { "filter_name": "Delisting Notice", "tag": "Delisting", "category": "Corporate Actions" },
+        { "filter_name": "Strategic Review Initiated", "tag": "Strategic Review", "category": "Corporate Actions" },
+        { "filter_name": "Business Restructuring", "tag": "Restructuring", "category": "Corporate Actions" },
+        { "filter_name": "Asset Impairment Recorded", "tag": "Impairment", "category": "Corporate Actions" },
+        { "filter_name": "Reverse Stock Split", "tag": "Reverse Split", "category": "Corporate Actions" },
+        { "filter_name": "Stock Split Announced", "tag": "Stock Split", "category": "Corporate Actions" },
+        { "filter_name": "Going Private Transaction", "tag": "Going Private", "category": "Corporate Actions" },
+        { "filter_name": "Change in Control", "tag": "Change of Control", "category": "Corporate Actions" },
+        { "filter_name": "Earnings Beat Expectations", "tag": "Earnings Beat", "category": "Earnings & Financial Results" },
+        { "filter_name": "Earnings Miss Expectations", "tag": "Earnings Miss", "category": "Earnings & Financial Results" },
+        { "filter_name": "Earnings Inline with Estimates", "tag": "Earnings Inline", "category": "Earnings & Financial Results" },
+        { "filter_name": "Earnings Pre-Announcement", "tag": "Earnings Prelim", "category": "Earnings & Financial Results" },
+        { "filter_name": "Earnings Restatement Issued", "tag": "Earnings Restated", "category": "Earnings & Financial Results" },
+        { "filter_name": "Revenue Growth Reported", "tag": "Revenue Growth", "category": "Earnings & Financial Results" },
+        { "filter_name": "Revenue Decline Reported", "tag": "Revenue Decline", "category": "Earnings & Financial Results" },
+        { "filter_name": "Margin Expansion Reported", "tag": "Margin Expansion", "category": "Earnings & Financial Results" },
+        { "filter_name": "Margin Compression Reported", "tag": "Margin Compression", "category": "Earnings & Financial Results" },
+        { "filter_name": "Cash Flow Improvement", "tag": "Cash Flow Up", "category": "Earnings & Financial Results" },
+        { "filter_name": "Cash Flow Deterioration", "tag": "Cash Flow Down", "category": "Earnings & Financial Results" },
+        { "filter_name": "Operating Income Growth", "tag": "Operating Income Up", "category": "Earnings & Financial Results" },
+        { "filter_name": "Operating Income Decline", "tag": "Operating Income Down", "category": "Earnings & Financial Results" },
+        { "filter_name": "Cost Reduction Program Announced", "tag": "Cost Reduction", "category": "Earnings & Financial Results" },
+        { "filter_name": "Cost Inflation Pressure", "tag": "Cost Pressure", "category": "Earnings & Financial Results" },
+        { "filter_name": "Guidance Raised", "tag": "Guidance Raised", "category": "Guidance & Outlook" },
+        { "filter_name": "Guidance Cut", "tag": "Guidance Cut", "category": "Guidance & Outlook" },
+        { "filter_name": "Guidance Issued", "tag": "Guidance Issued", "category": "Guidance & Outlook" },
+        { "filter_name": "Guidance Reaffirmed", "tag": "Guidance Reaffirmed", "category": "Guidance & Outlook" },
+        { "filter_name": "Long-Term Outlook Updated", "tag": "Outlook Updated", "category": "Guidance & Outlook" },
+        { "filter_name": "Outlook Withdrawn", "tag": "Outlook Withdrawn", "category": "Guidance & Outlook" },
+        { "filter_name": "Forecast Change Announced", "tag": "Forecast Change", "category": "Guidance & Outlook" },
+        { "filter_name": "Demand Outlook Change", "tag": "Demand Outlook", "category": "Guidance & Outlook" },
+        { "filter_name": "Macro Sensitivity Warning", "tag": "Macro Warning", "category": "Guidance & Outlook" },
+        { "filter_name": "Capital Expenditure Outlook Change", "tag": "CapEx Outlook", "category": "Guidance & Outlook" },
+        { "filter_name": "Dividend Declared", "tag": "Dividend Declared", "category": "Capital Allocation" },
+        { "filter_name": "Dividend Increase Announced", "tag": "Dividend Increase", "category": "Capital Allocation" },
+        { "filter_name": "Dividend Cut Announced", "tag": "Dividend Cut", "category": "Capital Allocation" },
+        { "filter_name": "Share Buyback Announced", "tag": "Buyback Announced", "category": "Capital Allocation" },
+        { "filter_name": "Share Buyback Expansion", "tag": "Buyback Expanded", "category": "Capital Allocation" },
+        { "filter_name": "Share Buyback Suspension", "tag": "Buyback Suspended", "category": "Capital Allocation" },
+        { "filter_name": "Debt Issuance Announced", "tag": "Debt Issuance", "category": "Capital Allocation" },
+        { "filter_name": "Debt Reduction Announced", "tag": "Debt Reduction", "category": "Capital Allocation" },
+        { "filter_name": "Equity Capital Raise", "tag": "Equity Raise", "category": "Capital Allocation" },
+        { "filter_name": "Convertible Debt Issuance", "tag": "Convertible Debt", "category": "Capital Allocation" },
+        { "filter_name": "Credit Facility Update", "tag": "Credit Facility", "category": "Capital Allocation" },
+        { "filter_name": "Leverage Target Change", "tag": "Leverage Change", "category": "Capital Allocation" },
+        { "filter_name": "SEC Filing Submitted", "tag": "SEC Filing", "category": "Legal & Regulatory" },
+        { "filter_name": "SEC Investigation Announced", "tag": "SEC Investigation", "category": "Legal & Regulatory" },
+        { "filter_name": "DOJ Investigation Announced", "tag": "DOJ Investigation", "category": "Legal & Regulatory" },
+        { "filter_name": "Lawsuit Filed", "tag": "Lawsuit", "category": "Legal & Regulatory" },
+        { "filter_name": "Legal Settlement Reached", "tag": "Settlement", "category": "Legal & Regulatory" },
+        { "filter_name": "Antitrust Action Initiated", "tag": "Antitrust Action", "category": "Legal & Regulatory" },
+        { "filter_name": "Regulatory Approval Granted", "tag": "Regulatory Approval", "category": "Legal & Regulatory" },
+        { "filter_name": "Regulatory Approval Denied", "tag": "Regulatory Rejection", "category": "Legal & Regulatory" },
+        { "filter_name": "Compliance Violation Disclosed", "tag": "Compliance Violation", "category": "Legal & Regulatory" },
+        { "filter_name": "Fine or Penalty Issued", "tag": "Fine / Penalty", "category": "Legal & Regulatory" },
+        { "filter_name": "Consent Decree Issued", "tag": "Consent Decree", "category": "Legal & Regulatory" },
+        { "filter_name": "Licensing Risk Identified", "tag": "Licensing Risk", "category": "Legal & Regulatory" },
+        { "filter_name": "Sanctions Exposure Identified", "tag": "Sanctions Risk", "category": "Legal & Regulatory" },
     ];
 
     constructor(private fundService: FundService) { }
@@ -237,7 +265,7 @@ export class NewsComponent implements OnInit {
         if (hasCategories || hasFlags) {
             result = result.filter(article => {
                 // 1. Check Categories
-                const matchesCategory = article.tags.some(tag => this.selectedCategories.has(tag.category));
+                const matchesCategory = article.tags.some(tag => this.selectedCategories.has(tag.category as TagCategory));
                 if (matchesCategory) return true;
 
                 // 2. Check Advanced Flags
@@ -261,12 +289,7 @@ export class NewsComponent implements OnInit {
     }
 
     hasActiveAdvancedFilters(): boolean {
-        // Check if any specific boolean flag is true
-        return this.checkGroup(this.corporateActions) ||
-            this.checkGroup(this.earningsFinancials) ||
-            this.checkGroup(this.guidanceOutlook) ||
-            this.checkGroup(this.capitalAllocation) ||
-            this.checkGroup(this.legalRegulatory) ||
+        return Object.values(this.activeFilters).some(v => v === true) ||
             this.checkGroup(this.marketReaction) ||
             this.checkGroup(this.analystActions);
     }
@@ -275,33 +298,19 @@ export class NewsComponent implements OnInit {
         return Object.values(group).some(val => val === true);
     }
 
+    getFiltersByCategory(categoryName: string) {
+        return this.eventTags.filter(t => t.category === categoryName);
+    }
+
     matchesAdvancedFilters(article: Article): boolean {
-        const t = (label: string) => article.tags.some(tag => tag.label === label);
-        const c = (cat: string) => article.tags.some(tag => tag.category === cat);
+        const t = (label: string) => article.tags.some(tag => tag.label === label || tag.tag === label || tag.filter_name === label);
 
-        // Corporate Actions
-        if (this.corporateActions.mergerAnnounced && (t('M&A') || c('Merger'))) return true;
-        if (this.corporateActions.acquisition && (t('M&A') || c('Merger'))) return true; // Broad matching
-        if (this.corporateActions.management && (t('Management') || c('Management'))) return true;
+        // Advanced Filters (Data-driven)
+        for (const filterName in this.activeFilters) {
+            if (this.activeFilters[filterName] && t(filterName)) return true;
+        }
 
-        // Earnings
-        if (this.earningsFinancials.earningsBeat && t('Earnings Beat')) return true;
-        if (this.earningsFinancials.earningsMiss && t('Earnings Miss')) return true;
-
-        // Guidance
-        if (this.guidanceOutlook.guidanceRaised && (t('Guidance') && c('Positive'))) return true; // Approx
-        if (this.guidanceOutlook.guidanceCut && (t('Guidance') && c('Negative'))) return true;
-        if (this.guidanceOutlook.guidanceIssued && t('Guidance')) return true;
-
-        // Capital
-        if (this.capitalAllocation.dividendDeclared && (t('Dividend/Buyback') || c('Dividend'))) return true;
-        if (this.capitalAllocation.shareBuyback && t('Dividend/Buyback')) return true;
-
-        // Legal
-        if (this.legalRegulatory.lawsuit && (t('Legal/Regulatory') || c('Legal'))) return true;
-        if (this.legalRegulatory.secInvestigation && (t('Legal/Regulatory') || c('Legal'))) return true;
-
-        // Analyst
+        // Analyst (Legacy/Fallback)
         if (this.analystActions.ratingUpgrade && t('Analyst Upgrade')) return true;
         if (this.analystActions.ratingDowngrade && t('Analyst Downgrade')) return true;
 
@@ -345,11 +354,7 @@ export class NewsComponent implements OnInit {
         let count = 0;
         count += this.selectedAssets.length;
         count += Object.values(this.articleTypes).filter(v => v).length;
-        count += Object.values(this.corporateActions).filter(v => v).length;
-        count += Object.values(this.earningsFinancials).filter(v => v).length;
-        count += Object.values(this.guidanceOutlook).filter(v => v).length;
-        count += Object.values(this.capitalAllocation).filter(v => v).length;
-        count += Object.values(this.legalRegulatory).filter(v => v).length;
+        count += Object.values(this.activeFilters).filter(v => v).length;
         count += Object.values(this.marketReaction).filter(v => v).length;
         count += Object.values(this.analystActions).filter(v => v).length;
         count += Object.values(this.sectors).filter(v => v).length;
@@ -359,19 +364,15 @@ export class NewsComponent implements OnInit {
 
     getSectionActiveCount(sectionId: string): number {
         // Get count of active filters in a specific section (UI only)
+        const cat = this.filterCategories.find(c => c.id === sectionId);
+        if (cat) {
+            const filters = this.getFiltersByCategory(cat.name);
+            return filters.filter(f => this.activeFilters[f.filter_name]).length;
+        }
+
         switch (sectionId) {
             case 'articles-included':
                 return Object.values(this.articleTypes).filter(v => v).length;
-            case 'corporate-actions':
-                return Object.values(this.corporateActions).filter(v => v).length;
-            case 'earnings-financials':
-                return Object.values(this.earningsFinancials).filter(v => v).length;
-            case 'guidance-outlook':
-                return Object.values(this.guidanceOutlook).filter(v => v).length;
-            case 'capital-allocation':
-                return Object.values(this.capitalAllocation).filter(v => v).length;
-            case 'legal-regulatory':
-                return Object.values(this.legalRegulatory).filter(v => v).length;
             case 'market-reaction':
                 return Object.values(this.marketReaction).filter(v => v).length;
             case 'analyst-actions':
@@ -384,15 +385,8 @@ export class NewsComponent implements OnInit {
     }
 
     getSectionAccentColor(sectionId: string): string {
-        // Get accent color for section headers (UI only)
-        const colorMap: { [key: string]: string } = {
-            'corporate-actions': '#007bff',
-            'earnings-financials': '#28a745',
-            'guidance-outlook': '#ffc107',
-            'capital-allocation': '#fd7e14',
-            'legal-regulatory': '#dc3545'
-        };
-        return colorMap[sectionId] || '#666';
+        const cat = this.filterCategories.find(c => c.id === sectionId);
+        return cat ? cat.accent : '#666';
     }
 
     getSentimentColor(score: number): string {

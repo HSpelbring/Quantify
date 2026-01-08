@@ -15,6 +15,7 @@ import random
 import re
 import nltk
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
+from tagging_config import EVENT_TAGS
 
 app = FastAPI()
 
@@ -642,28 +643,87 @@ def auto_tag_news(title: str, summary: str = ""):
             cat = "Crypto"
         else:
             cat = "Stock"
-        tags.append({"label": sym, "category": cat})
+        tags.append({"label": sym, "filter_name": sym, "tag": sym, "category": cat})
+
+    # Helper to find tag config by filter name
+    def get_tag_info(filter_name):
+        return next((t for t in EVENT_TAGS if t["filter_name"] == filter_name), None)
+
+    def add_tag(filter_name):
+        config = get_tag_info(filter_name)
+        if config:
+            tags.append({
+                "label": config["tag"], # Backward compatibility
+                "filter_name": config["filter_name"],
+                "tag": config["tag"],
+                "category": config["category"]
+            })
 
     # --- 2. SENTIMENT REASONS (Granular) ---
     # POSITIVE INDICATORS
     if any(x in text for x in ["beat", "surpass", "crush", "topple"]):
-        tags.append({"label": "Earnings Beat", "category": "Positive"})
+        add_tag("Earnings Beat Expectations")
     if any(x in text for x in ["upgrade", "buy rating", "raised price", "outperform"]):
-        tags.append({"label": "Analyst Upgrade", "category": "Positive"})
+        add_tag("Analyst Upgrade")
     if any(x in text for x in ["record", "high", "soar", "surge", "jump", "rally", "skyrocket"]):
-        tags.append({"label": "Price Surge", "category": "Positive"})
+        add_tag("Price Surge")
     if any(x in text for x in ["gain", "growth", "climb", "rise", "bull"]):
-        tags.append({"label": "Momentum", "category": "Positive"})
+        add_tag("Momentum")
 
     # NEGATIVE INDICATORS
     if any(x in text for x in ["miss", "lag", "short of"]):
-        tags.append({"label": "Earnings Miss", "category": "Negative"})
+        add_tag("Earnings Miss Expectations")
     if any(x in text for x in ["downgrade", "sell rating", "cut price", "underperform"]):
-        tags.append({"label": "Analyst Downgrade", "category": "Negative"})
+        add_tag("Analyst Downgrade")
     if any(x in text for x in ["drop", "fall", "plunge", "slide", "crash", "slump", "dive", "low"]):
-        tags.append({"label": "Price Drop", "category": "Negative"})
+        add_tag("Price Drop")
     if any(x in text for x in ["loss", "decline", "weak", "bear", "down"]):
-        tags.append({"label": "Decline", "category": "Negative"})
+        add_tag("Decline")
+    
+    # Corporate Actions
+    if any(x in text for x in ["merger", "combine with"]):
+        add_tag("Merger Announced")
+    if "acquisition" in text or "acquires" in text:
+        add_tag("Acquisition Announced")
+    if "buyout" in text or "takeover" in text:
+        add_tag("Buyout / Takeover")
+    if "spin-off" in text or "spinoff" in text:
+        add_tag("Spin-Off Announced")
+    if any(x in text for x in ["divestiture", "asset sale"]):
+        add_tag("Divestiture / Asset Sale")
+    if "ipo" in text:
+        add_tag("IPO Announced")
+    if "delisting" in text:
+        add_tag("Delisting Notice")
+    
+    # Capital Allocation
+    if "dividend" in text:
+        if any(x in text for x in ["increase", "raise"]):
+            add_tag("Dividend Increase Announced")
+        elif "cut" in text or "slash" in text:
+            add_tag("Dividend Cut Announced")
+        else:
+            add_tag("Dividend Declared")
+    
+    if "buyback" in text or "share repurchase" in text:
+        if any(x in text for x in ["expand", "increase", "billion"]):
+            add_tag("Share Buyback Expansion")
+        elif "suspended" in text or "halting" in text:
+            add_tag("Share Buyback Suspension")
+        else:
+            add_tag("Share Buyback Announced")
+
+    # Legal
+    if "lawsuit" in text or "sue" in text:
+        add_tag("Lawsuit Filed")
+    if "settlement" in text or "settle" in text:
+        add_tag("Legal Settlement Reached")
+    if "sec filing" in text:
+        add_tag("SEC Filing Submitted")
+    if "sec" in text and ("investigation" in text or "investigates" in text):
+        add_tag("SEC Investigation Announced")
+    if "doj" in text and ("investigation" in text or "investigates" in text):
+        add_tag("DOJ Investigation Announced")
 
     # -- CORPORATE (Granular) --
     if any(x in text for x in ["dividend", "buyback", "share repurchase", "yield"]):
@@ -1937,3 +1997,65 @@ def get_insider_trading_sec(ticker: str):
         print(f"Error fetching SEC insider data for {ticker}: {e}")
         traceback.print_exc()
         return {"error": str(e), "trades": []}
+@app.get("/indicators/{symbol}")
+def get_indicators(symbol: str):
+    try:
+        ticker = yf.Ticker(symbol)
+        # Fetch 2 years of history for Golden Cross (200 SMA)
+        hist = ticker.history(period="2y")
+        if hist.empty:
+            return {"error": "No data"}
+
+        # 1. daily_return_pct
+        latest_close = float(hist['Close'].iloc[-1])
+        prev_close = float(hist['Close'].iloc[-2]) if len(hist) > 1 else latest_close
+        daily_return = ((latest_close - prev_close) / prev_close) * 100
+
+        # 2. volume_vs_30d_avg
+        latest_vol = float(hist['Volume'].iloc[-1])
+        avg_30d_vol = float(hist['Volume'].tail(30).mean())
+        vol_ratio = latest_vol / avg_30d_vol if avg_30d_vol > 0 else 1.0
+
+        # 3. ma_cross_50_200
+        ma50 = hist['Close'].rolling(window=50).mean()
+        ma200 = hist['Close'].rolling(window=200).mean()
+        
+        cross_event = "none"
+        if len(hist) >= 200:
+            curr_ma50 = ma50.iloc[-1]
+            curr_ma200 = ma200.iloc[-1]
+            prev_ma50 = ma50.iloc[-2]
+            prev_ma200 = ma200.iloc[-2]
+            
+            if prev_ma50 <= prev_ma200 and curr_ma50 > curr_ma200:
+                cross_event = "crosses_above"
+            elif prev_ma50 >= prev_ma200 and curr_ma50 < curr_ma200:
+                cross_event = "crosses_below"
+
+        # 4. rsi_14
+        delta = hist['Close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs))
+        latest_rsi = float(rsi.iloc[-1]) if not rsi.empty else 50.0
+
+        # 5. price_change_5d_pct
+        price_5d_ago = float(hist['Close'].iloc[-6]) if len(hist) >= 6 else float(hist['Close'].iloc[0])
+        change_5d = ((latest_close - price_5d_ago) / price_5d_ago) * 100
+
+        # 6. dist_ma200_pct
+        latest_ma200 = float(ma200.iloc[-1]) if len(hist) >= 200 else latest_close
+        dist_ma200 = ((latest_close - latest_ma200) / latest_ma200) * 100
+
+        return {
+            "symbol": symbol.upper(),
+            "daily_return_pct": round(daily_return, 2),
+            "volume_vs_30d_avg": round(vol_ratio, 2),
+            "ma_cross_50_200": cross_event,
+            "rsi_14": round(latest_rsi, 2),
+            "price_change_5d_pct": round(change_5d, 2),
+            "dist_ma200_pct": round(dist_ma200, 2)
+        }
+    except Exception as e:
+        return {"error": str(e)}

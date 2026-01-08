@@ -3,6 +3,7 @@ package api
 import (
 	"backend/internal/db"
 	"backend/internal/fetch"
+	"backend/internal/models"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // RegisterRoutes sets up the API routes for the Gin router.
@@ -320,6 +322,83 @@ func RegisterRoutes(router *gin.Engine) {
 
 			// Forward response
 			c.DataFromReader(http.StatusOK, resp.ContentLength, "application/json", resp.Body, nil)
+		})
+
+		// --- Notification Rules ---
+
+		// List all rules
+		r.GET("/rules", func(c *gin.Context) {
+			rules, err := db.GetRules()
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, rules)
+		})
+
+		// Create a new rule
+		r.POST("/rules", func(c *gin.Context) {
+			var rule models.NotificationRule
+			if err := c.BindJSON(&rule); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			if rule.ID == "" {
+				rule.ID = uuid.New().String()
+			}
+			if rule.LastTriggered == nil {
+				rule.LastTriggered = make(map[string]string)
+			}
+
+			err := db.SaveRule(rule)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusCreated, rule)
+		})
+
+		// Toggle a rule (enable/disable)
+		r.PATCH("/rules/:id", func(c *gin.Context) {
+			id := c.Param("id")
+			var input struct {
+				Enabled bool `json:"enabled"`
+			}
+			if err := c.BindJSON(&input); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			err := db.ToggleRule(id, input.Enabled)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"status": "updated"})
+		})
+
+		// --- Triggered Notifications ---
+
+		// Get active notifications
+		r.GET("/notifications", func(c *gin.Context) {
+			notes, err := db.GetActiveNotifications()
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, notes)
+		})
+
+		// Dismiss a notification
+		r.POST("/notifications/:id/dismiss", func(c *gin.Context) {
+			id := c.Param("id")
+			err := db.DismissNotification(id)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"status": "dismissed"})
 		})
 	}
 }

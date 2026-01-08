@@ -65,6 +65,12 @@ func InitDB() error {
 		return err
 	}
 
+	// Initialize rules table
+	err = InitRules(DB)
+	if err != nil {
+		return err
+	}
+
 	// MIGRATION: Ensure article_type exists for existing databases
 	// We ignore the error because if the column exists, it will fail, which is fine.
 	_, _ = DB.Exec("ALTER TABLE news_articles ADD COLUMN article_type TEXT")

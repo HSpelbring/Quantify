@@ -38,6 +38,36 @@ export class SettingsComponent implements OnInit {
   // Computed Categories for UI
   categories = ['Indices', 'Commodities', 'FX', 'Rates', 'Volatility', 'Crypto'];
 
+  // Notification Rules
+  rules: any[] = [];
+  showCreateRule = false;
+  newRule: any = {
+    name: '',
+    definition: {
+      universe: { type: 'single_ticker', value: '' },
+      timeframe: '1D',
+      cooldown_days: 3,
+      logic: {
+        condition: { var: 'daily_return_pct', op: '>=', value: 0 }
+      }
+    }
+  };
+
+  // Expanded Sections State
+  expandedSections: Set<string> = new Set(['Indices', 'Commodities', 'FX', 'Rates', 'Volatility', 'Crypto']);
+
+  toggleSection(section: string) {
+    if (this.expandedSections.has(section)) {
+      this.expandedSections.delete(section);
+    } else {
+      this.expandedSections.add(section);
+    }
+  }
+
+  isSectionExpanded(section: string): boolean {
+    return this.expandedSections.has(section);
+  }
+
   constructor(private tickerService: TickerSettingsService) { }
 
   ngOnInit() {
@@ -45,6 +75,7 @@ export class SettingsComponent implements OnInit {
     this.checkSystemStatus();
     this.calculateCacheSize();
     this.loadTickerSettings();
+    this.loadRules();
   }
 
   loadSettings() {
@@ -150,5 +181,102 @@ export class SettingsComponent implements OnInit {
       localStorage.removeItem('quantify_portfolio');
       location.reload();
     }
+  }
+
+  loadRules() {
+    fetch('http://localhost:8080/api/rules')
+      .then(res => res.json())
+      .then(data => this.rules = data)
+      .catch(err => console.error('Error loading rules:', err));
+  }
+
+  createRule() {
+    // Basic validation
+    if (!this.newRule.name || !this.newRule.definition.universe.value) {
+      alert('Please fill in name and ticker/watchlist.');
+      return;
+    }
+
+    // Convert value to number if operator is numeric
+    const cond = this.newRule.definition.logic.condition;
+    if (cond.op === '>=' || cond.op === '<=') {
+      cond.value = Number(cond.value);
+    } else {
+      cond.value = null; // for events
+    }
+
+    fetch('http://localhost:8080/api/rules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(this.newRule)
+    })
+      .then(res => res.json())
+      .then(data => {
+        this.rules.unshift(data);
+        this.showCreateRule = false;
+        this.resetNewRule();
+      })
+      .catch(err => console.error('Error creating rule:', err));
+  }
+
+  resetNewRule() {
+    this.newRule = {
+      name: '',
+      definition: {
+        universe: { type: 'single_ticker', value: '' },
+        timeframe: '1D',
+        cooldown_days: 3,
+        logic: {
+          condition: { var: 'daily_return_pct', op: '>=', value: 0 }
+        }
+      }
+    };
+  }
+
+  toggleRule(rule: any) {
+    rule.enabled = !rule.enabled;
+    fetch(`http://localhost:8080/api/rules/${rule.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: rule.enabled })
+    })
+      .then(res => {
+        if (!res.ok) rule.enabled = !rule.enabled; // Revert if failed
+      })
+      .catch(err => {
+        console.error('Error toggling rule:', err);
+        rule.enabled = !rule.enabled; // Revert
+      });
+  }
+
+  formatRuleLogic(node: any): string {
+    if (!node) return '';
+    if (node.condition) {
+      const c = node.condition;
+      let op = c.op;
+      if (op === '>=') op = '≥';
+      if (op === '<=') op = '≤';
+      if (op === '>') op = '>';
+      if (op === '<') op = '<';
+      if (op === '==' || op === '=') op = '=';
+      if (op === '!=') op = '≠';
+      if (op === 'crosses_above') op = 'crosses above';
+      if (op === 'crosses_below') op = 'crosses below';
+
+      const varName = c.var.replace(/_/g, ' ').replace('rsi 14', 'RSI (14)').replace('dist ma200 pct', 'Dist from MA200 %').replace('5d pct', '5D %');
+      const suffix = c.var.includes('pct') || c.var.includes('avg') || c.var.includes('rsi') ? (c.var.includes('pct') ? '%' : c.var.includes('rsi') ? '' : 'x') : '';
+      const val = c.value !== null ? ` ${c.value}${suffix}` : '';
+      return `${varName} ${op}${val}`;
+    }
+    if (node.and) return `(${node.and.map((n: any) => this.formatRuleLogic(n)).join(' AND ')})`;
+    if (node.or) return `(${node.or.map((n: any) => this.formatRuleLogic(n)).join(' OR ')})`;
+    if (node.not) return `NOT (${this.formatRuleLogic(node.not)})`;
+    return '';
+  }
+
+  getUniverseLabel(u: any): string {
+    if (u.type === 'single_ticker') return u.value;
+    if (u.type === 'watchlist') return `Watchlist (${u.value})`;
+    return u.value;
   }
 }

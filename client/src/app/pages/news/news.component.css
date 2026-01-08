@@ -279,7 +279,7 @@
 }
 
 .category-blue .section-header.has-active {
-    border-left-color: #4fc3f7;
+    border-left-color: #007bff;
 }
 
 .category-green .section-header {
@@ -288,7 +288,7 @@
 }
 
 .category-green .section-header.has-active {
-    border-left-color: #5dff88;
+    border-left-color: #28a745;
 }
 
 .category-yellow .section-header {
@@ -297,7 +297,7 @@
 }
 
 .category-yellow .section-header.has-active {
-    border-left-color: #ffeb3b;
+    border-left-color: #ffc107;
 }
 
 .category-orange .section-header {
@@ -306,7 +306,7 @@
 }
 
 .category-orange .section-header.has-active {
-    border-left-color: #ff9f50;
+    border-left-color: #fd7e14;
 }
 
 .category-red .section-header {
@@ -315,7 +315,34 @@
 }
 
 .category-red .section-header.has-active {
-    border-left-color: #ff6b7a;
+    border-left-color: #dc3545;
+}
+
+.category-purple .section-header {
+    border-left: 3px solid #6f42c1;
+    padding-left: 8px;
+}
+
+.category-purple .section-header.has-active {
+    border-left-color: #6f42c1;
+}
+
+.category-pink .section-header {
+    border-left: 3px solid #d63384;
+    padding-left: 8px;
+}
+
+.category-pink .section-header.has-active {
+    border-left-color: #d63384;
+}
+
+.category-gray .section-header {
+    border-left: 3px solid #6c757d;
+    padding-left: 8px;
+}
+
+.category-gray .section-header.has-active {
+    border-left-color: #6c757d;
 }
 
 /* CHECKBOX STYLING - Enhanced Affordances */
