@@ -576,6 +576,12 @@
     gap: 5px;
 }
 
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 .sort-select {
     background-color: #2a2a2a;
     color: white;
@@ -588,6 +594,23 @@
 }
 
 .sort-select:focus {
+    border-color: #4fc3f7;
+}
+
+.btn-action {
+    background-color: #2a2a2a;
+    color: white;
+    border: 1px solid #444;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+
+.btn-action:hover {
+    background-color: #333;
     border-color: #4fc3f7;
 }
 
@@ -709,18 +732,28 @@
     filter: brightness(1.1);
 }
 
-/* STRICT COLOR CODING */
-.tag[data-cat="Stock"] {
-    background-color: #007bff;
+/* Default Fallback */
+.tag {
+    background-color: #6c757d;
+    /* Gray for unknown */
 }
 
-.tag[data-cat="Fund"] {
+/* STRICT COLOR CODING */
+.tag[data-cat="Stock"] {
     background-color: #4fc3f7;
+    /* Light Blue */
     color: #000;
 }
 
+.tag[data-cat="Fund"] {
+    background-color: #28a745;
+    /* Light Green */
+    color: white;
+}
+
 .tag[data-cat="Crypto"] {
-    background-color: #ffc107;
+    background-color: #f88;
+    /* Light Red */
     color: #000;
 }
 
@@ -736,34 +769,41 @@
     background-color: #28a745;
 }
 
-.tag[data-cat="Corporate"] {
-    background-color: #fd7e14;
+/* Updated Categories to match Backend "tagging_config.py" */
+.tag[data-cat="Corporate Actions"] {
+    background-color: #007bff;
+    /* Blue */
 }
 
-.tag[data-cat="Merger"] {
+.tag[data-cat="Earnings & Financial Results"] {
     background-color: #6610f2;
+    /* Indigo/Purple */
 }
 
-.tag[data-cat="Dividend"] {
+.tag[data-cat="Capital Allocation"] {
     background-color: #20c997;
+    /* Teal */
     color: #000;
+}
+
+.tag[data-cat="Guidance & Outlook"] {
+    background-color: #d63384;
+    /* Pink */
 }
 
 .tag[data-cat="Management"] {
     background-color: #fd7e14;
 }
 
-.tag[data-cat="Guidance"] {
-    background-color: #d63384;
+.tag[data-cat="Legal & Regulatory"] {
+    background-color: #c82333;
+    /* Red */
 }
 
+/* Keep Analyst legacy or if used by other parts */
 .tag[data-cat="Analyst"] {
     background-color: #ffc107;
     color: black;
-}
-
-.tag[data-cat="Legal"] {
-    background-color: #c82333;
 }
 
 /* RIGHT SCORE */

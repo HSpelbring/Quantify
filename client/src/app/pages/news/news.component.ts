@@ -206,19 +206,38 @@ export class NewsComponent implements OnInit {
             this.articles = data;
             this.applyFilters();
             this.loading = false; // Show content immediately
+        });
+    }
 
-            // 2. Trigger Background Refresh (ETL Pipeline)
-            console.log("Triggering background news refresh...");
-            this.fundService.refreshNews().subscribe(resp => {
-                console.log("News refreshed:", resp);
-                if (resp.status === 'refreshed' && resp.count > 0) {
-                    // if new articles found, reload the feed quietly
-                    this.fundService.getNews().subscribe(newData => {
-                        this.articles = newData;
-                        this.applyFilters();
-                    });
-                }
-            });
+    refreshNews() {
+        this.loading = true;
+        this.fundService.refreshNews().subscribe(resp => {
+            console.log("News refreshed:", resp);
+            if (resp.status === 'refreshed' && resp.count > 0) {
+                // reload feed
+                this.fundService.getNews().subscribe(newData => {
+                    this.articles = newData;
+                    this.applyFilters();
+                    this.loading = false;
+                });
+            } else {
+                this.loading = false;
+            }
+        });
+    }
+
+    enrichNews() {
+        // Optimistic UI or separate loader? For now just log
+        console.log("Triggering enrichment...");
+        this.fundService.enrichNews(5).subscribe(resp => {
+            console.log("Enrichment complete:", resp);
+            // Optionally reload to show new tags/content
+            if (resp.enriched > 0) {
+                this.fundService.getNews().subscribe(newData => {
+                    this.articles = newData;
+                    this.applyFilters();
+                });
+            }
         });
     }
 

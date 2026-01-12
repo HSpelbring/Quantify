@@ -17,6 +17,12 @@ export class SettingsComponent implements OnInit {
   backendOnline = false;
   latency = 0;
   cacheSize = '0 KB';
+  backendUptime = 'Unknown';
+  lastSync = 'Never';
+
+  // API Status
+  apiStatus: 'Operational' | 'Degraded' | 'Down' = 'Down';
+  activeDataSources = ['Finnhub', 'Alpha Vantage', 'Yahoo Finance', 'SEC EDGAR'];
 
   // Configuration
   keys = {
@@ -37,6 +43,20 @@ export class SettingsComponent implements OnInit {
 
   // Computed Categories for UI
   categories = ['Indices', 'Commodities', 'FX', 'Rates', 'Volatility', 'Crypto'];
+
+  // Navigation
+  activeSection = 'system';
+  sections = [
+    { id: 'system', label: 'System Status' },
+    { id: 'api', label: 'API' },
+    { id: 'preferences', label: 'Preferences' },
+    { id: 'notifications', label: 'Notification Rules' },
+    { id: 'instruments', label: 'Ticker Instruments' }
+  ];
+
+  setActiveSection(id: string) {
+    this.activeSection = id;
+  }
 
   // Notification Rules
   rules: any[] = [];
@@ -72,7 +92,7 @@ export class SettingsComponent implements OnInit {
 
   ngOnInit() {
     this.loadSettings();
-    this.checkSystemStatus();
+    this.checkSystemStatus(); // Initial check
     this.calculateCacheSize();
     this.loadTickerSettings();
     this.loadRules();
@@ -151,18 +171,33 @@ export class SettingsComponent implements OnInit {
     this.cacheSize = (total / 1024).toFixed(2) + ' KB';
   }
 
-  checkSystemStatus() {
+  refreshStatus() {
+    this.checkSystemStatus();
     this.calculateCacheSize();
+    this.loadRules();
+  }
+
+  checkSystemStatus() {
     const start = Date.now();
     // Simulate a ping to localhost:8080/api/health
     fetch('http://localhost:8080/api/health')
       .then(res => {
         this.backendOnline = res.ok;
         this.latency = Date.now() - start;
+        if (this.backendOnline) {
+          this.backendUptime = '3d 14h 22m'; // Mocked for now
+          this.lastSync = new Date().toLocaleTimeString();
+          this.apiStatus = 'Operational';
+        } else {
+          this.backendUptime = 'Down';
+          this.apiStatus = 'Down';
+        }
       })
       .catch(() => {
         this.backendOnline = false;
         this.latency = 0;
+        this.backendUptime = 'Down';
+        this.apiStatus = 'Down';
       });
   }
 

@@ -247,6 +247,12 @@
                 </div>
             </div>
             <div class="header-right">
+                <button class="btn-action" (click)="enrichNews()">
+                    ✨ Enrich
+                </button>
+                <button class="btn-action" (click)="refreshNews()">
+                    ↻ Refresh
+                </button>
                 <select [(ngModel)]="sortOption" (change)="applyFilters()" class="sort-select">
                     <option value="recent">Most Recent</option>
                     <option value="bullish">Most Bullish</option>

@@ -1,9 +1,10 @@
-# Last updated: Real News Integration (Fixed Parsing)
+# Last updated: GDELT Integration
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from analytics.insights import generate_insight
 import rss_service
+import gdelt_enrichment
 import yfinance as yf
-from fastapi.middleware.cors import CORSMiddleware
 import time
 import traceback
 import requests
@@ -26,6 +27,72 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+import asyncio
+
+@app.on_event("startup")
+async def start_background_tasks():
+    # Start the background enrichment loop
+    asyncio.create_task(schedule_enrichment())
+
+async def schedule_enrichment():
+    print("Background Task Manager: Started")
+    while True:
+        try:
+            print("Background: Starting incremental enrichment check (limit=5)...")
+            # Run in thread pool to avoid blocking async loop
+            # Pass auto_tag_news as callback
+            await asyncio.to_thread(gdelt_enrichment.enrich_pending_articles, limit=5, tagger_callback=auto_tag_news)
+        except Exception as e:
+            print(f"Background Enrichment Error: {e}")
+        
+        # specific waiting period: 5 minutes
+        await asyncio.sleep(300)
+
+@app.post("/news/enrich")
+def trigger_enrichment(limit: int = 5):
+    """
+    Manually trigger GDELT enrichment for partial articles.
+    limit <= 0 means process ALL.
+    """
+    # Pass auto_tag_news to enable content-based tagging
+    result = gdelt_enrichment.enrich_pending_articles(limit=limit, tagger_callback=auto_tag_news)
+    return result
+
+@app.post("/news/retag")
+def retag_enriched_articles(limit: int = 0):
+    """
+    Re-runs content-based tagging on articles that already have full content.
+    Useful after updating tagging rules.
+    """
+    import json
+    conn = gdelt_enrichment.get_db_connection()
+    cursor = conn.cursor()
+    
+    query = "SELECT id, title, content FROM news_articles WHERE has_full_content = 1"
+    if limit > 0:
+        query += f" LIMIT {limit}"
+        
+    cursor.execute(query)
+    rows = cursor.fetchall()
+    
+    count = 0
+    for row in rows:
+        aid, title, content = row
+        if not content: continue
+        
+        tags = auto_tag_news(title, content=content)
+        if tags:
+            try:
+                tags_json = json.dumps(tags)
+                cursor.execute("UPDATE news_articles SET tags = ? WHERE id = ?", (tags_json, aid))
+                count += 1
+            except Exception as e:
+                print(f"Retag error {aid}: {e}")
+                
+    conn.commit()
+    conn.close()
+    return {"status": "complete", "retagged": count}
 
 # --- Source Categorization Logic ---
 def classify_source_type(provider: str, title: str) -> str:
@@ -543,7 +610,7 @@ def load_dynamic_tickers():
             # Heuristic: Map first word if distinct (e.g. "Adobe")
             # Avoid generic words: "General" (General Motors vs General Electric), "Western", "United"
             first = clean.split()[0]
-            if len(first) >= 4 and first not in ["american", "united", "general", "national", "first", "northern", "southern", "western", "eastern", "public", "citizens"]:
+            if len(first) >= 4 and first not in ["american", "united", "general", "national", "first", "northern", "southern", "western", "eastern", "public", "citizens", "news"]:
                 if first not in KNOWN_ENTITIES:
                     KNOWN_ENTITIES[first] = sym
             
@@ -557,29 +624,86 @@ def load_dynamic_tickers():
 # Load immediately on startup (async in bg might be better but this is fast enough)
 load_dynamic_tickers()
 
-def auto_tag_news(title: str, summary: str = ""):
+def auto_tag_news(title: str, summary: str = "", content: str = None):
     """
     Enhanced keyword-based tagger.
     Scans for Sentiment, Categories, AND Tickers/Company Names.
+    Uses 'content' if provided for deep scanning, otherwise falls back to summary.
     """
-    text = (title + " " + summary).lower()
+    # 1. Combine text for searching
+    # We weight title matches implicitly by checking it, but for keywords we search roughly the same.
+    # Use content if available (it refers to full text), otherwise summary.
+    body_text = content if content else summary
+    # Limit body scan to first 5000 chars for performance/relevance
+    search_text = (title + " " + body_text[:5000]).lower()
+    
     tags = []
 
-    # --- 1. ENTITY EXTRACTION (Global Lookup with Strict Tokens) ---
+    # --- 1. EVENT / CATEGORY TAGS (Advanced Regex Parsing) ---
+    # We prioritize Title matches (strongest signal) over Body matches.
+    # regex word boundaries (\b) are used to prevent partial word matching (e.g. avoiding "listing" matching "delisting" if not careful, though keywords help).
+    
+    for et in EVENT_TAGS:
+        match_found = False
+        tag_config = {
+            "label": et["tag"], 
+            "filter_name": et["filter_name"], 
+            "tag": et["tag"], 
+            "category": et["category"]
+        }
+
+        # 1. Check Title (High Priority) using Regex
+        # We search for any keyword in the title with word boundaries
+        if "keywords" in et:
+            for kw in et["keywords"]:
+                # Escape keyword to safely handle special chars, then wrap in \b
+                # Note: valid python identifiers/keywords don't usually need escape but good practice
+                pattern = r'\b' + re.escape(kw) + r'\b'
+                if re.search(pattern, title.lower()):
+                    tags.append(tag_config)
+                    match_found = True
+                    break # Stop checking this tag's keywords
+        
+        if match_found: continue
+
+        # 2. Check Body (Medium Priority)
+        # Only if not found in title.
+        # We require at least one robust match.
+        if body_text and "keywords" in et:
+            # We limit body scan in the top setup, but let's be sure
+            scan_body = body_text[:5000].lower()
+            for kw in et["keywords"]:
+                pattern = r'\b' + re.escape(kw) + r'\b'
+                if re.search(pattern, scan_body):
+                    tags.append(tag_config)
+                    match_found = True
+                    break
+        
+        if match_found: continue
+
+        # 3. Fallback: Check filter_name in Title (Legacy/Safety)
+        # If keywords failed (or missing), check if the filter name itself appears in the title
+        # e.g. "Merger Announced" literal string? Unlikely, but "Merger" yes.
+        # This is a catch-all.
+        if et["filter_name"].lower() in title.lower():
+             tags.append(tag_config)
+
+    # --- 2. ENTITY EXTRACTION (Global Lookup with Strict Tokens) ---
     found_syms = set()
     
-    # Tokenize: Split by non-alphanumeric
-    raw_tokens = re.split(r'[^a-zA-Z0-9]+', text) # text is lower here... wait.
-    # The function first line is `text = (title + " " + summary).lower()`
-    # I need case-sensitive tokens!
+    # CASE SENSITIVE Tokenization for Tickers
+    # finding "ALL" (ticker) vs "all" (word) requires preserving case during tokenization
+    # We scan the full combined text for tickers
+    full_text_for_tickers = (title + " " + (body_text if body_text else "")[:5000])
     
-    # Recover cased text
-    full_text_cased = title + " " + summary
-    tokens_cased = set(re.split(r'[^a-zA-Z0-9]+', full_text_cased))
+    # Regex split to get tokens
+    tokens_cased = set(re.split(r'[^a-zA-Z0-9]+', full_text_for_tickers))
     tokens_lower = set(t.lower() for t in tokens_cased)
     
     for key, sym in KNOWN_ENTITIES.items():
-         # Filter out very common words that might be in S&P 500 names
+         # key is lowercase from the map
+         
+        # Filter out very common words that might be in S&P 500 names
         # e.g. "Target" -> TGT, "Best" -> BBY, "Gap" -> GPS
         if key in ["target", "best", "gap", "corp", "inc"]:
              if key == "target" and "tgt" in tokens_lower: found_syms.add(sym)
@@ -590,20 +714,10 @@ def auto_tag_news(title: str, summary: str = ""):
             continue
 
         # Ambiguity Fix: Nasdaq (Exchange) vs Nasdaq (Stock) vs QQQ (Index)
-        # If "Nasdaq" is found, usually implies the market (QQQ/IXIC) unless "Nasdaq Inc" -> NDAQ
         if key == "nasdaq":
              if "inc" in tokens_lower or "exchange" in tokens_lower:
                  found_syms.add("NDAQ")
-             # Else, we might leave it as QQQ or NDAQ? 
-             # For now, let's map generic "nasdaq" to market index QQQ for relevance, 
-             # OR NDAQ if user specifically asked for NDAQ.
-             # Current explicit map: "nasdaq" -> "NDAQ" in my list above? 
-             # Wait, strict list above has "nasdaq": "NDAQ". 
-             # But "nasdaq": "QQQ" was in previous list lines 170.
-             # CONFLICT: Line 170 says "nasdaq": "QQQ". Line 186 (new) says "nasdaq": "NDAQ".
-             # Python dict info: last write wins. New list is appended. So "nasdaq" -> "NDAQ".
-             # Let's fix this conflict by removing "nasdaq": "QQQ" from line 170 in a separate edit or handling here.
-             pass
+             pass # Else ignore 'nasdaq' general mentions to avoid noise (or map to QQQ if desired)
 
         # Ambiguous Tickers that are also common words (require UPPERCASE match)
         # 3-4 letter words that are very common in headlines
@@ -612,7 +726,7 @@ def auto_tag_news(title: str, summary: str = ""):
             "FAST", "RUN", "EAT", "LOVE", "SAFE", "PLAY", "BEAT", "NEXT", 
             "BIG", "CASH", "GOLD", "TRUE", "EVER", "FIVE", "LIFE", "LOW",
             "MIND", "OPEN", "OUT", "REAL", "ROLL", "SAVE", "SPOT", "STEP", 
-            "TELL", "WELL", "WORK"
+            "TELL", "WELL", "WORK", "ARE"
         }
 
         # Case 1: Short Ticker Safety (length <= 2)
@@ -632,17 +746,18 @@ def auto_tag_news(title: str, summary: str = ""):
              if key in tokens_lower:
                  found_syms.add(sym)
 
-    # Fund & Crypto Whitelists
+    # Fund & Crypto Whitelists (RESTORED for Categorization & Coloring)
     FUND_SYMBOLS = {"SPY", "QQQ", "DIA", "IWM", "VIX", "VOO", "IVV", "ARKK", "SMH", "XLF", "XLE", "XLK", "XLV", "XLY", "XLP", "XLU", "XLI", "XLB", "XLRE"}
-    CRYPTO_SYMBOLS = {"BTC-USD", "ETH-USD", "XRP-USD", "SOL-USD", "DOGE-USD"}
+    CRYPTO_SYMBOLS = {"BTC-USD", "ETH-USD", "XRP-USD", "SOL-USD", "DOGE-USD", "BTC", "ETH", "XRP", "SOL", "DOGE"}
 
     for sym in found_syms:
+        # Default category
+        cat = "Stock"
         if sym in FUND_SYMBOLS:
             cat = "Fund"
-        elif sym in CRYPTO_SYMBOLS:
+        elif sym in CRYPTO_SYMBOLS or "-USD" in sym:
             cat = "Crypto"
-        else:
-            cat = "Stock"
+            
         tags.append({"label": sym, "filter_name": sym, "tag": sym, "category": cat})
 
     # Helper to find tag config by filter name
@@ -659,119 +774,26 @@ def auto_tag_news(title: str, summary: str = ""):
                 "category": config["category"]
             })
 
-    # --- 2. SENTIMENT REASONS (Granular) ---
-    # POSITIVE INDICATORS
-    if any(x in text for x in ["beat", "surpass", "crush", "topple"]):
-        add_tag("Earnings Beat Expectations")
-    if any(x in text for x in ["upgrade", "buy rating", "raised price", "outperform"]):
-        add_tag("Analyst Upgrade")
-    if any(x in text for x in ["record", "high", "soar", "surge", "jump", "rally", "skyrocket"]):
-        add_tag("Price Surge")
-    if any(x in text for x in ["gain", "growth", "climb", "rise", "bull"]):
-        add_tag("Momentum")
-
-    # NEGATIVE INDICATORS
-    if any(x in text for x in ["miss", "lag", "short of"]):
-        add_tag("Earnings Miss Expectations")
-    if any(x in text for x in ["downgrade", "sell rating", "cut price", "underperform"]):
-        add_tag("Analyst Downgrade")
-    if any(x in text for x in ["drop", "fall", "plunge", "slide", "crash", "slump", "dive", "low"]):
-        add_tag("Price Drop")
-    if any(x in text for x in ["loss", "decline", "weak", "bear", "down"]):
-        add_tag("Decline")
-    
-    # Corporate Actions
-    if any(x in text for x in ["merger", "combine with"]):
-        add_tag("Merger Announced")
-    if "acquisition" in text or "acquires" in text:
-        add_tag("Acquisition Announced")
-    if "buyout" in text or "takeover" in text:
-        add_tag("Buyout / Takeover")
-    if "spin-off" in text or "spinoff" in text:
-        add_tag("Spin-Off Announced")
-    if any(x in text for x in ["divestiture", "asset sale"]):
-        add_tag("Divestiture / Asset Sale")
-    if "ipo" in text:
-        add_tag("IPO Announced")
-    if "delisting" in text:
-        add_tag("Delisting Notice")
-    
-    # Capital Allocation
-    if "dividend" in text:
-        if any(x in text for x in ["increase", "raise"]):
-            add_tag("Dividend Increase Announced")
-        elif "cut" in text or "slash" in text:
-            add_tag("Dividend Cut Announced")
-        else:
-            add_tag("Dividend Declared")
-    
-    if "buyback" in text or "share repurchase" in text:
-        if any(x in text for x in ["expand", "increase", "billion"]):
-            add_tag("Share Buyback Expansion")
-        elif "suspended" in text or "halting" in text:
-            add_tag("Share Buyback Suspension")
-        else:
-            add_tag("Share Buyback Announced")
-
-    # Legal
-    if "lawsuit" in text or "sue" in text:
-        add_tag("Lawsuit Filed")
-    if "settlement" in text or "settle" in text:
-        add_tag("Legal Settlement Reached")
-    if "sec filing" in text:
-        add_tag("SEC Filing Submitted")
-    if "sec" in text and ("investigation" in text or "investigates" in text):
-        add_tag("SEC Investigation Announced")
-    if "doj" in text and ("investigation" in text or "investigates" in text):
-        add_tag("DOJ Investigation Announced")
-
-    # -- CORPORATE (Granular) --
-    if any(x in text for x in ["dividend", "buyback", "share repurchase", "yield"]):
-        tags.append({"label": "Dividend/Buyback", "category": "Dividend"})
-    
-    if any(x in text for x in ["merger", "acquisition", "acquire", "buyout", "deal", "takeover", "bid for"]):
-        tags.append({"label": "M&A", "category": "Merger"})
-        
-    if any(x in text for x in ["appoint", "ceo", "cfo", "step down", "resign", "fire", "hired", "executive"]):
-        tags.append({"label": "Management", "category": "Management"})
-        
-    if any(x in text for x in ["guidance", "outlook", "forecast", "projection", "raise view", "cut view"]):
-        tags.append({"label": "Guidance", "category": "Guidance"})
-        
-    # -- EARNINGS SPECIFIC --
-    if any(x in text for x in ["earnings", "profit", "revenue", "sales", "eps", "quarter"]):
-        # Only add generic Earnings tag if we didn't get a specific "Beat" or "Miss" tag earlier
-        if not any(t['label'] in ["Earnings Beat", "Earnings Miss"] for t in tags):
-             tags.append({"label": "Earnings", "category": "Corporate"})
-
-    # -- LEGAL --
-    if any(x in text for x in ["sue", "lawsuit", "settle", "investigation", "probe", "fine", "court", "regulatory", "sec ", "antitrust", "ban"]):
-        tags.append({"label": "Legal/Regulatory", "category": "Legal"})
-
-    # -- ANALYST --
-    if any(x in text for x in ["analyst", "target", "fitch", "moody", "morgan", "goldman", "upgrade", "downgrade", "estimate"]):
-        tags.append({"label": "Analyst Update", "category": "Analyst"})
-
     # -- SECTOR (Approximation) --
     # Only tag sectors if we didn't find specific entities (Stocks/Funds).
     # This prevents noise like tagging every Apple article as "Technology".
     if not found_syms:
-        if any(x in text for x in ["tech", "ai ", "software", "cloud", "chip", "semiconductor", "cyber"]):
+        if any(x in search_text for x in ["tech", "ai ", "software", "cloud", "chip", "semiconductor", "cyber"]):
             tags.append({"label": "Technology", "category": "Sector"})
-        if any(x in text for x in ["oil", "gas", "energy", "solar", "wind", "electric"]):
+        if any(x in search_text for x in ["oil", "gas", "energy", "solar", "wind", "electric"]):
             tags.append({"label": "Energy", "category": "Sector"})
-        if any(x in text for x in ["drug", "pharma", "trial", "fda", "biotech"]):
+        if any(x in search_text for x in ["drug", "pharma", "trial", "fda", "biotech"]):
             tags.append({"label": "Healthcare", "category": "Sector"})
-        if any(x in text for x in ["bank", "rate", "fed ", "inflation", "finance", "crypto", "bitcoin"]):
+        if any(x in search_text for x in ["bank", "rate", "fed ", "inflation", "finance", "crypto", "bitcoin"]):
             tags.append({"label": "Finance/Macro", "category": "Sector"})
-        if any(x in text for x in ["retail", "consumer", "sales", "spending"]):
+        if any(x in search_text for x in ["retail", "consumer", "sales", "spending"]):
             tags.append({"label": "Retail", "category": "Sector"})
-        if any(x in text for x in ["auto", "car", "vehicle", "ev "]):
+        if any(x in search_text for x in ["auto", "car", "vehicle", "ev "]):
             tags.append({"label": "Automotive", "category": "Sector"})
 
-    # Default if empty
-    if not tags:
-        tags.append({"label": "General News", "category": "Sector"})
+    # Default if empty (REMOVED - User requested removing 'General News')
+    # if not tags:
+    #    tags.append({"label": "General News", "category": "Sector"})
 
     return tags
 
@@ -915,34 +937,36 @@ def get_price(symbol: str):
 
 
 @app.get("/quotes")
-def get_quotes():
+def get_quotes(symbols: str = ""):
     global QUOTE_CACHE, QUOTE_CACHE_TIME
 
+    # cache key needs to include symbols if provided
+    # Simplified: if symbols provided, skip cache or use separate cache
+    # For now: Skip cache if custom symbols
+    use_cache = not symbols
+    
     now = time.time()
-    if QUOTE_CACHE and (now - QUOTE_CACHE_TIME) < CACHE_TTL:
+    if use_cache and QUOTE_CACHE and (now - QUOTE_CACHE_TIME) < CACHE_TTL:
         print(f"[CACHE] Returning cached results ({int(now - QUOTE_CACHE_TIME)}s old)")
         return QUOTE_CACHE
 
-    print("\n=== Fetching all quotes (fresh) ===")
+    print(f"\n=== Fetching quotes (fresh) [Symbols: {symbols or 'Default'}] ===")
 
-    fetch_order = {
-        "^GSPC": ["^GSPC"],    # S&P 500
-        "^NDX": ["^NDX"],      # NASDAQ 100
-        "^DJI": ["^DJI"],      # Dow Jones
-        "^RUT": ["^RUT"],      # Russell 2000
-        "^VIX": ["^VIX"],      # VIX
-        "BTC-USD": ["BTC-USD"] # Bitcoin
-    }
+    # Determine target list
+    targets = []
+    if symbols:
+        targets = [s.strip() for s in symbols.split(",") if s.strip()]
+    else:
+        # Default list (matches Go defaults)
+        targets = ["^GSPC", "^NDX", "^DJI", "^RUT", "^VIX", "BTC-USD"]
 
     results = {}
 
-    for index_symbol, tickers in fetch_order.items():
-        primary = tickers[0]
-        print(f"\n-> Fetching {index_symbol} ...")
-
+    for sym in targets:
+        print(f"-> Fetching {sym} ...")
         try:
             # daily price movement
-            hist = yf.Ticker(primary).history(period="5d", interval="1d")
+            hist = yf.Ticker(sym).history(period="5d", interval="1d")
             if len(hist) >= 2:
                 latest = hist["Close"].iloc[-1]
                 prev = hist["Close"].iloc[-2]
@@ -950,30 +974,33 @@ def get_quotes():
                 pct = round(((latest - prev) / prev) * 100, 2)
 
                 # intraday history (REAL sparkline data)
-                intra = get_intraday_history(primary)
+                # Optimization: For Commodities/Futures, yfinance might not give good 1m data freely/reliably,
+                # but we will try. If empty, sparkline is flat.
+                intra = get_intraday_history(sym)
 
-                results[index_symbol] = {
+                results[sym] = {
                     "price": round(float(latest), 2),
                     "change": pct,
                     "open": round(float(open_price), 2),
                     "history": intra
                 }
 
-                print(f"   OK: {primary} = {latest} ({pct}%) with {len(intra)} intraday points")
+                print(f"   OK: {sym} = {latest} ({pct}%)")
                 continue
 
         except Exception as e:
-            print(f"   ERROR: {e}")
+            print(f"   ERROR {sym}: {e}")
 
         # fallback:
-        print(f"   FALLBACK: {index_symbol} set to 0 / 0")
-        results[index_symbol] = {"price": 0, "change": 0, "open": 0, "history": []}
+        # results[sym] = ... (Frontend handles missing keys or we return 0s)
+        results[sym] = {"price": 0, "change": 0, "open": 0, "history": []}
 
-    print("\n=== Final results (fresh) ===")
-    print(results)
-
-    QUOTE_CACHE = results
-    QUOTE_CACHE_TIME = now
+    print("\n=== Final results ===")
+    
+    if use_cache:
+        QUOTE_CACHE = results
+        QUOTE_CACHE_TIME = now
+        
     return results
 
 @app.get("/stock/{symbol}")

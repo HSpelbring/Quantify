@@ -192,6 +192,24 @@ func RegisterRoutes(router *gin.Engine) {
 			}
 		})
 
+		//  Enrich News (Trigger Secondary Enrichment)
+		r.POST("/news/enrich", func(c *gin.Context) {
+			// Proxy to Python service
+			// We can forward the 'limit' query param if needed, or default to 5
+			limit := c.DefaultQuery("limit", "5")
+
+			resp, err := http.Post("http://localhost:8000/news/enrich?limit="+limit, "application/json", nil)
+			if err != nil {
+				log.Println("Error contacting Python service for enrichment:", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			defer resp.Body.Close()
+
+			// Forward response
+			c.DataFromReader(http.StatusOK, resp.ContentLength, "application/json", resp.Body, nil)
+		})
+
 		//  Search News (Historical)
 		r.GET("/news/search", func(c *gin.Context) {
 			query := c.Query("q")

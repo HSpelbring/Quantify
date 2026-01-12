@@ -101,6 +101,15 @@ export class FundService {
     );
   }
 
+  enrichNews(limit: number = 5): Observable<any> {
+    return this.http.post<any>(`/api/news/enrich?limit=${limit}`, {}).pipe(
+      catchError(err => {
+        console.error('News enrichment error:', err);
+        return of({ error: 'Failed to enrich' });
+      })
+    );
+  }
+
   searchStocks(query: string): Observable<any[]> {
     if (!query) return of([]);
     return this.http.get<any[]>(`/api/search?q=${query}`).pipe(

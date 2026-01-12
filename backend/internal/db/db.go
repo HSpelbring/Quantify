@@ -75,6 +75,7 @@ func InitDB() error {
 	// We ignore the error because if the column exists, it will fail, which is fine.
 	_, _ = DB.Exec("ALTER TABLE news_articles ADD COLUMN article_type TEXT")
 	_, _ = DB.Exec("ALTER TABLE news_articles ADD COLUMN has_full_content BOOLEAN DEFAULT 0")
+	_, _ = DB.Exec("ALTER TABLE news_articles ADD COLUMN content TEXT")
 
 	return DB.Ping()
 }

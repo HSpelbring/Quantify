@@ -8,6 +8,7 @@ import (
 )
 
 // Article structure matches the Python API response
+// Article structure matches the Python API response
 type Article struct {
 	ID             string  `json:"id"`
 	Title          string  `json:"title"`
@@ -19,6 +20,7 @@ type Article struct {
 	Tags           any     `json:"tags"` // JSON array or struct, kept as any for flexible encoding
 	Link           string  `json:"link"` // url
 	HasFullContent bool    `json:"hasFullContent"`
+	Content        string  `json:"content"`
 }
 
 // SaveArticles inserts new articles into the database
@@ -32,8 +34,8 @@ func SaveArticles(articles []Article) error {
 	// Ensure article_type column exists (idempotent check not easy here freely, relying on migration or previous Exec)
 
 	stmt, err := tx.Prepare(`
-		INSERT INTO news_articles (id, title, source, article_type, url, published_at, sentiment_score, sentiment_label, tags, has_full_content)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO news_articles (id, title, source, article_type, url, published_at, sentiment_score, sentiment_label, tags, has_full_content, content)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			tags = excluded.tags,
 			sentiment_score = excluded.sentiment_score,
@@ -41,7 +43,8 @@ func SaveArticles(articles []Article) error {
 			article_type = excluded.article_type,
 			title = excluded.title,
 			url = excluded.url,
-			has_full_content = excluded.has_full_content
+			has_full_content = excluded.has_full_content,
+			content = excluded.content
 	`)
 	if err != nil {
 		return err
@@ -63,6 +66,7 @@ func SaveArticles(articles []Article) error {
 			a.SentimentLabel,
 			string(tagsJSON),
 			a.HasFullContent,
+			a.Content,
 		)
 		if err != nil {
 			log.Printf("Error inserting/updating article %s: %v", a.Title, err)
@@ -87,7 +91,7 @@ func SearchNews(query string, limit int) ([]Article, error) {
 	// Common pattern: SELECT * FROM news_articles WHERE rowid IN (SELECT rowid FROM news_fts WHERE news_fts MATCH ?)
 
 	rows, err := DB.Query(`
-		SELECT id, title, source, article_type, url, published_at, sentiment_score, sentiment_label, tags, has_full_content
+		SELECT id, title, source, article_type, url, published_at, sentiment_score, sentiment_label, tags, has_full_content, COALESCE(content, '')
 		FROM news_articles 
 		WHERE rowid IN (
 			SELECT rowid FROM news_fts WHERE news_fts MATCH ? ORDER BY rank
@@ -115,6 +119,7 @@ func SearchNews(query string, limit int) ([]Article, error) {
 			&a.SentimentLabel,
 			&tagsStr,
 			&a.HasFullContent,
+			&a.Content,
 		)
 		if err != nil {
 			log.Println("Error scanning row:", err)
@@ -139,7 +144,7 @@ func GetRecentArticlesBalanced(quota int) ([]Article, error) {
 
 	for _, t := range types {
 		rows, err := DB.Query(`
-			SELECT id, title, source, article_type, url, published_at, sentiment_score, sentiment_label, tags, has_full_content
+			SELECT id, title, source, article_type, url, published_at, sentiment_score, sentiment_label, tags, has_full_content, COALESCE(content, '')
 			FROM news_articles
 			WHERE article_type = ?
 			ORDER BY published_at DESC
@@ -154,7 +159,7 @@ func GetRecentArticlesBalanced(quota int) ([]Article, error) {
 		for rows.Next() {
 			var a Article
 			var tagsStr string
-			err := rows.Scan(&a.ID, &a.Title, &a.Source, &a.ArticleType, &a.Link, &a.Timestamp, &a.SentimentScore, &a.SentimentLabel, &tagsStr, &a.HasFullContent)
+			err := rows.Scan(&a.ID, &a.Title, &a.Source, &a.ArticleType, &a.Link, &a.Timestamp, &a.SentimentScore, &a.SentimentLabel, &tagsStr, &a.HasFullContent, &a.Content)
 			if err == nil {
 				json.Unmarshal([]byte(tagsStr), &a.Tags)
 				allResults = append(allResults, a)
@@ -167,7 +172,7 @@ func GetRecentArticlesBalanced(quota int) ([]Article, error) {
 // GetArticlesByPage support pagination (limit/offset)
 func GetArticlesByPage(limit, offset int) ([]Article, error) {
 	rows, err := DB.Query(`
-		SELECT id, title, source, article_type, url, published_at, sentiment_score, sentiment_label, tags, has_full_content
+		SELECT id, title, source, article_type, url, published_at, sentiment_score, sentiment_label, tags, has_full_content, COALESCE(content, '')
 		FROM news_articles
 		ORDER BY published_at DESC
 		LIMIT ? OFFSET ?
@@ -181,7 +186,7 @@ func GetArticlesByPage(limit, offset int) ([]Article, error) {
 	for rows.Next() {
 		var a Article
 		var tagsStr string
-		err := rows.Scan(&a.ID, &a.Title, &a.Source, &a.ArticleType, &a.Link, &a.Timestamp, &a.SentimentScore, &a.SentimentLabel, &tagsStr, &a.HasFullContent)
+		err := rows.Scan(&a.ID, &a.Title, &a.Source, &a.ArticleType, &a.Link, &a.Timestamp, &a.SentimentScore, &a.SentimentLabel, &tagsStr, &a.HasFullContent, &a.Content)
 		if err == nil {
 			json.Unmarshal([]byte(tagsStr), &a.Tags)
 			results = append(results, a)

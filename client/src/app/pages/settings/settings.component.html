@@ -1,257 +1,299 @@
 <div class="settings-page">
   <h1>Settings</h1>
 
-  <div class="settings-tiers">
-    <!-- TOP TIER: 3 BOXES -->
-    <div class="settings-tier top-tier">
-      <!-- SYSTEM STATUS CARD -->
-      <div class="settings-card">
-        <h2>System Status</h2>
-        <div class="status-list">
-          <div class="status-item">
-            <span class="status-label">Backend Connection</span>
-            <span class="status-value">
-              <span class="status-indicator" [class.online]="backendOnline" [class.offline]="!backendOnline"></span>
-              {{ backendOnline ? 'Online' : 'Offline' }}
-            </span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">Latency</span>
-            <span class="status-value">{{ latency }}ms</span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">App Version</span>
-            <span class="status-value">v0.8.2</span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">Cache Size</span>
-            <span class="status-value">{{ cacheSize }}</span>
-          </div>
-          <div style="margin-top: 15px; display: flex; justify-content: flex-end;">
-            <button class="btn-secondary" (click)="checkSystemStatus()">Creating Status...</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- API CONFIG CARD -->
-      <div class="settings-card">
-        <h2>API Configuration</h2>
-
-        <div class="form-group">
-          <label>Finnhub API Key</label>
-          <div class="input-row">
-            <input type="password" [(ngModel)]="keys.finnhub" placeholder="Enter Finnhub Key">
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>Alpha Vantage Key</label>
-          <div class="input-row">
-            <input type="password" [(ngModel)]="keys.alpha" placeholder="Enter Alpha Vantage Key">
-          </div>
-        </div>
-
-        <div style="display: flex; gap: 10px; margin-top: 10px;">
-          <button class="btn-primary" (click)="saveKeys()">Save Keys</button>
-          <button class="btn-secondary" (click)="testKeys()">Test Keys</button>
-        </div>
-      </div>
-
-      <!-- PREFERENCES CARD -->
-      <div class="settings-card">
-        <h2>Preferences</h2>
-
-        <div class="pref-item">
-          <div class="pref-label">
-            <span>Default Timeframe</span>
-            <div class="pref-desc">Range shown on charts by default</div>
-          </div>
-          <select [(ngModel)]="preferences.timeframe"
-            style="padding: 8px; border-radius: 6px; background: rgba(0,0,0,0.3); color: white; border: 1px solid #444;">
-            <option value="1D">1 Day</option>
-            <option value="1M">1 Month</option>
-            <option value="1Y">1 Year</option>
-          </select>
-        </div>
-
-        <div class="pref-item">
-          <div class="pref-label">
-            <span>Auto-Refresh</span>
-            <div class="pref-desc">Update portfolio data automatically</div>
-          </div>
-          <input type="checkbox" [(ngModel)]="preferences.autoRefresh" style="transform: scale(1.2);">
-        </div>
-
-        <div class="pref-item">
-          <div class="pref-label">
-            <span>Show Animations</span>
-            <div class="pref-desc">Enable UI transitions and effects</div>
-          </div>
-          <input type="checkbox" [(ngModel)]="preferences.animations" style="transform: scale(1.2);">
-        </div>
+  <div class="settings-container">
+    <!-- LEFT SIDEBAR -->
+    <div class="settings-sidebar">
+      <div *ngFor="let section of sections" class="sidebar-item" [class.active]="activeSection === section.id"
+        (click)="setActiveSection(section.id)">
+        {{ section.label }}
       </div>
     </div>
 
-    <!-- BOTTOM TIER: 2 BOXES -->
-    <div class="settings-tier bottom-tier">
-      <!-- NOTIFICATION RULES CARD -->
-      <div class="settings-card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-          <h2 style="margin: 0; border: none; padding: 0;">Notification Rules</h2>
-          <button class="btn-primary" (click)="showCreateRule = !showCreateRule">
-            {{ showCreateRule ? 'Cancel' : '+ Create' }}
-          </button>
+    <!-- RIGHT CONTENT AREA -->
+    <div class="settings-content">
+
+      <!-- SYSTEM STATUS -->
+      <div *ngIf="activeSection === 'system'" class="fade-in">
+        <div class="settings-card">
+          <h2>System Status</h2>
+          <div class="status-list">
+            <div class="status-item">
+              <span class="status-label">Backend Connection</span>
+              <span class="status-value">
+                <span class="status-indicator" [class.online]="backendOnline" [class.offline]="!backendOnline"></span>
+                {{ backendOnline ? 'Online' : 'Offline' }}
+              </span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">Backend Uptime</span>
+              <span class="status-value">{{ backendUptime }}</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">Latency</span>
+              <span class="status-value">{{ latency }}ms</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">Last Successful Sync</span>
+              <span class="status-value">{{ lastSync }}</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">App Version</span>
+              <span class="status-value">v0.8.2</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">Cache Size</span>
+              <span class="status-value">{{ cacheSize }}</span>
+            </div>
+            <div style="margin-top: 15px; display: flex; justify-content: flex-end;">
+              <button class="btn-secondary refresh-btn" (click)="refreshStatus()">
+                ↻ Refresh Status
+              </button>
+            </div>
+          </div>
         </div>
-        <p style="color: #888; font-size: 13px; margin: 0 0 15px 0;">
-          Define rules to trigger alerts based on technical indicators.
-        </p>
+      </div>
 
-        <!-- REDESIGNED CREATE RULE FORM -->
-        <div *ngIf="showCreateRule" class="create-rule-form v2">
-          <div class="form-section">
-            <div class="section-label">Rule Identity</div>
-            <div class="form-group full-width">
-              <label>Rule Name</label>
-              <input type="text" [(ngModel)]="newRule.name" placeholder="e.g. BTC Breakout">
-              <span class="field-hint">A descriptive name to identify this alert on the dashboard.</span>
+      <!-- API SECTION -->
+      <div *ngIf="activeSection === 'api'" class="fade-in">
+        <div class="settings-card">
+          <h2>API</h2>
+
+          <!-- API STATUS -->
+          <div class="api-status-block" [ngClass]="apiStatus.toLowerCase()">
+            <div class="api-status-header">
+              <span class="status-dot"></span>
+              <span class="status-text">API Status: {{ apiStatus }}</span>
             </div>
           </div>
 
-          <div class="form-section">
-            <div class="section-label">Parameters</div>
-            <div class="form-grid-3">
-              <div class="form-group">
-                <label>Universe Type</label>
-                <select [(ngModel)]="newRule.definition.universe.type">
-                  <option value="single_ticker">Single Ticker</option>
-                  <option value="watchlist">Watchlist</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>{{ newRule.definition.universe.type === 'single_ticker' ? 'Ticker' : 'Watchlist Name' }}</label>
-                <input type="text" [(ngModel)]="newRule.definition.universe.value" placeholder="e.g. NVDA">
-              </div>
-              <div class="form-group">
-                <label>Cooldown</label>
-                <select [(ngModel)]="newRule.definition.cooldown_days">
-                  <option [ngValue]="3">3 Days</option>
-                  <option [ngValue]="5">5 Days</option>
-                  <option [ngValue]="30">30 Days</option>
-                </select>
-              </div>
+          <!-- DATA SOURCES -->
+          <div class="form-group" style="margin-top: 20px;">
+            <label>Active Data Sources</label>
+            <div class="data-sources-list">
+              <span *ngFor="let source of activeDataSources" class="source-tag">{{ source }}</span>
             </div>
           </div>
 
-          <div class="form-section">
-            <div class="section-label">Condition Builder</div>
-            <div class="condition-builder-v2">
-              <div class="condition-input-group">
-                <select [(ngModel)]="newRule.definition.logic.condition.var" class="var-select">
-                  <option value="daily_return_pct">Daily Return %</option>
-                  <option value="price_change_5d_pct">5-Day Return %</option>
-                  <option value="volume_vs_30d_avg">Volume vs 30d Avg</option>
-                  <option value="rsi_14">RSI (14)</option>
-                  <option value="dist_ma200_pct">Dist from MA200 %</option>
-                  <option value="ma_cross_50_200">MA Cross (50/200)</option>
-                </select>
+          <div class="divider"></div>
 
-                <select [(ngModel)]="newRule.definition.logic.condition.op" class="op-select">
-                  <ng-container *ngIf="newRule.definition.logic.condition.var !== 'ma_cross_50_200'">
-                    <option value=">=">≥</option>
-                    <option value="<=">≤</option>
-                    <option value=">">></option>
-                    <option value="<">&lt;</option>
-                    <option value="==">=</option>
-                    <option value="!=">≠</option>
-                  </ng-container>
-                  <ng-container *ngIf="newRule.definition.logic.condition.var === 'ma_cross_50_200'">
-                    <option value="crosses_above">Crosses Above</option>
-                    <option value="crosses_below">Crosses Below</option>
-                  </ng-container>
-                </select>
+          <!-- CONFIGURATION -->
+          <div class="form-group">
+            <label>Finnhub API Key</label>
+            <div class="input-row">
+              <input type="password" [(ngModel)]="keys.finnhub" placeholder="Enter Finnhub Key" readonly>
+              <!-- Readonly requested -->
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Alpha Vantage Key</label>
+            <div class="input-row">
+              <input type="password" [(ngModel)]="keys.alpha" placeholder="Enter Alpha Vantage Key" readonly>
+            </div>
+          </div>
+          <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <button class="btn-secondary" (click)="saveKeys()" disabled>Edit Keys (Coming Soon)</button>
+          </div>
+        </div>
+      </div>
 
-                <div class="value-input-wrapper" *ngIf="newRule.definition.logic.condition.var !== 'ma_cross_50_200'">
-                  <input type="number" [(ngModel)]="newRule.definition.logic.condition.value">
-                  <span class="unit-label">{{ newRule.definition.logic.condition.var.includes('pct') ? '%' : ''
-                    }}</span>
+      <!-- PREFERENCES -->
+      <div *ngIf="activeSection === 'preferences'" class="fade-in">
+        <div class="settings-card">
+          <h2>Preferences</h2>
+          <div class="pref-item">
+            <div class="pref-label">
+              <span>Default Timeframe</span>
+              <div class="pref-desc">Range shown on charts by default</div>
+            </div>
+            <select [(ngModel)]="preferences.timeframe"
+              style="padding: 8px; border-radius: 6px; background: rgba(0,0,0,0.3); color: white; border: 1px solid #444;">
+              <option value="1D">1 Day</option>
+              <option value="1M">1 Month</option>
+              <option value="1Y">1 Year</option>
+            </select>
+          </div>
+          <div class="pref-item">
+            <div class="pref-label">
+              <span>Auto-Refresh</span>
+              <div class="pref-desc">Update portfolio data automatically</div>
+            </div>
+            <input type="checkbox" [(ngModel)]="preferences.autoRefresh" style="transform: scale(1.2);">
+          </div>
+          <div class="pref-item">
+            <div class="pref-label">
+              <span>Show Animations</span>
+              <div class="pref-desc">Enable UI transitions and effects</div>
+            </div>
+            <input type="checkbox" [(ngModel)]="preferences.animations" style="transform: scale(1.2);">
+          </div>
+        </div>
+      </div>
+
+      <!-- NOTIFICATION RULES -->
+      <div *ngIf="activeSection === 'notifications'" class="fade-in">
+        <div class="settings-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h2 style="margin: 0; border: none; padding: 0;">Notification Rules</h2>
+            <button class="btn-primary" (click)="showCreateRule = !showCreateRule">
+              {{ showCreateRule ? 'Cancel' : '+ Create' }}
+            </button>
+          </div>
+          <p style="color: #888; font-size: 13px; margin: 0 0 15px 0;">
+            Define rules to trigger alerts based on technical indicators.
+          </p>
+
+          <!-- CREATE RULE FORM -->
+          <div *ngIf="showCreateRule" class="create-rule-form v2">
+            <div class="form-section">
+              <div class="section-label">Rule Identity</div>
+              <div class="form-group full-width">
+                <label>Rule Name</label>
+                <input type="text" [(ngModel)]="newRule.name" placeholder="e.g. BTC Breakout">
+                <span class="field-hint">A descriptive name to identify this alert on the dashboard.</span>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="section-label">Parameters</div>
+              <div class="form-grid-3">
+                <div class="form-group">
+                  <label>Universe Type</label>
+                  <select [(ngModel)]="newRule.definition.universe.type">
+                    <option value="single_ticker">Single Ticker</option>
+                    <option value="watchlist">Watchlist</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>{{ newRule.definition.universe.type === 'single_ticker' ? 'Ticker' : 'Watchlist Name'
+                    }}</label>
+                  <input type="text" [(ngModel)]="newRule.definition.universe.value" placeholder="e.g. NVDA">
+                </div>
+                <div class="form-group">
+                  <label>Cooldown</label>
+                  <select [(ngModel)]="newRule.definition.cooldown_days">
+                    <option [ngValue]="3">3 Days</option>
+                    <option [ngValue]="5">5 Days</option>
+                    <option [ngValue]="30">30 Days</option>
+                  </select>
                 </div>
               </div>
-              <div class="condition-summary">
-                Alert will trigger when {{ formatRuleLogic(newRule.definition.logic) }}
+            </div>
+
+            <div class="form-section">
+              <div class="section-label">Condition Builder</div>
+              <div class="condition-builder-v2">
+                <div class="condition-input-group">
+                  <select [(ngModel)]="newRule.definition.logic.condition.var" class="var-select">
+                    <option value="daily_return_pct">Daily Return %</option>
+                    <option value="price_change_5d_pct">5-Day Return %</option>
+                    <option value="volume_vs_30d_avg">Volume vs 30d Avg</option>
+                    <option value="rsi_14">RSI (14)</option>
+                    <option value="dist_ma200_pct">Dist from MA200 %</option>
+                    <option value="ma_cross_50_200">MA Cross (50/200)</option>
+                  </select>
+
+                  <select [(ngModel)]="newRule.definition.logic.condition.op" class="op-select">
+                    <ng-container *ngIf="newRule.definition.logic.condition.var !== 'ma_cross_50_200'">
+                      <option value=">=">≥</option>
+                      <option value="<=">≤</option>
+                      <option value=">">></option>
+                      <option value="<">&lt;</option>
+                      <option value="==">=</option>
+                      <option value="!=">≠</option>
+                    </ng-container>
+                    <ng-container *ngIf="newRule.definition.logic.condition.var === 'ma_cross_50_200'">
+                      <option value="crosses_above">Crosses Above</option>
+                      <option value="crosses_below">Crosses Below</option>
+                    </ng-container>
+                  </select>
+
+                  <div class="value-input-wrapper" *ngIf="newRule.definition.logic.condition.var !== 'ma_cross_50_200'">
+                    <input type="number" [(ngModel)]="newRule.definition.logic.condition.value">
+                    <span class="unit-label">{{ newRule.definition.logic.condition.var.includes('pct') ? '%' : ''
+                      }}</span>
+                  </div>
+                </div>
+                <div class="condition-summary">
+                  Alert will trigger when {{ formatRuleLogic(newRule.definition.logic) }}
+                </div>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button class="btn-cancel-flat" (click)="showCreateRule = false">Discard Changes</button>
+              <button class="btn-save-premium" (click)="createRule()">
+                <span>Create Notification Rule</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="rules-list">
+            <div *ngFor="let rule of rules" class="rule-item compact">
+              <div class="rule-header">
+                <div class="rule-info">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="rule-name">{{ rule.name }}</span>
+                    <span class="meta-tag">{{ getUniverseLabel(rule.definition.universe) }}</span>
+                  </div>
+                  <div class="rule-meta">
+                    <span class="meta-tag">{{ rule.definition.timeframe }}</span>
+                    <span class="meta-tag">Cooldown: {{ rule.definition.cooldown_days }}d</span>
+                  </div>
+                </div>
+                <label class="switch small">
+                  <input type="checkbox" [checked]="rule.enabled" (change)="toggleRule(rule)">
+                  <span class="slider round"></span>
+                </label>
+              </div>
+              <div class="rule-logic">
+                <code class="logic-code">{{ formatRuleLogic(rule.definition.logic) }}</code>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TICKER INSTRUMENTS -->
+      <div *ngIf="activeSection === 'instruments'" class="fade-in">
+        <div class="settings-card">
+          <h2>Ticker Instruments</h2>
+          <p style="color: #888; font-size: 13px; margin-bottom: 15px;">
+            Select instruments to display in the bottom ticker (min 6).
+          </p>
+
+          <div class="ticker-categories">
+            <div *ngFor="let cat of activeSection === 'instruments' ? categories : []" class="ticker-cat-group">
+              <div class="cat-header" (click)="toggleSection(cat)">
+                <span class="arrow" [class.expanded]="isSectionExpanded(cat)">▶</span>
+                <h4>{{ cat }}</h4>
+                <span class="cat-count">{{ getInstrumentsByCategory(cat).length }} instruments</span>
+              </div>
+
+              <div class="cat-content" *ngIf="isSectionExpanded(cat)">
+                <div class="ticker-list-grid">
+                  <label *ngFor="let inst of getInstrumentsByCategory(cat)" class="modern-checkbox">
+                    <input type="checkbox" [checked]="isTickerSelected(inst.symbol)"
+                      (change)="toggleTicker(inst.symbol)">
+                    <span class="checkbox-box"></span>
+                    <span class="inst-name">{{ inst.name }}</span>
+                    <span class="inst-symbol">{{ inst.symbol }}</span>
+                  </label>
+                </div>
               </div>
             </div>
           </div>
 
-          <div class="form-actions">
-            <button class="btn-cancel-flat" (click)="showCreateRule = false">Discard Changes</button>
-            <button class="btn-save-premium" (click)="createRule()">
-              <span>Create Notification Rule</span>
+          <div style="margin-top: 20px; display: flex; align-items: center; justify-content: space-between;">
+            {{ tickerSaveError }}
+            <button class="btn-primary" (click)="saveTickerSettings()" [disabled]="tickerSaveError !== ''">
+              Save Selection
             </button>
           </div>
         </div>
-
-        <div class="rules-list">
-          <div *ngFor="let rule of rules" class="rule-item compact">
-            <div class="rule-header">
-              <div class="rule-info">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <span class="rule-name">{{ rule.name }}</span>
-                  <span class="meta-tag">{{ getUniverseLabel(rule.definition.universe) }}</span>
-                </div>
-                <div class="rule-meta">
-                  <span class="meta-tag">{{ rule.definition.timeframe }}</span>
-                  <span class="meta-tag">Cooldown: {{ rule.definition.cooldown_days }}d</span>
-                </div>
-              </div>
-              <label class="switch small">
-                <input type="checkbox" [checked]="rule.enabled" (change)="toggleRule(rule)">
-                <span class="slider round"></span>
-              </label>
-            </div>
-            <div class="rule-logic">
-              <code class="logic-code">{{ formatRuleLogic(rule.definition.logic) }}</code>
-            </div>
-          </div>
-        </div>
       </div>
 
-      <!-- TICKER CONFIG CARD -->
-      <div class="settings-card">
-        <h2>Ticker Instruments</h2>
-        <p style="color: #888; font-size: 13px; margin-bottom: 15px;">
-          Select instruments to display in the bottom ticker (min 6).
-        </p>
-
-        <div class="ticker-categories">
-          <div *ngFor="let cat of categories" class="ticker-cat-group">
-            <div class="cat-header" (click)="toggleSection(cat)">
-              <span class="arrow" [class.expanded]="isSectionExpanded(cat)">▶</span>
-              <h4>{{ cat }}</h4>
-              <span class="cat-count">{{ getInstrumentsByCategory(cat).length }} instruments</span>
-            </div>
-
-            <div class="cat-content" *ngIf="isSectionExpanded(cat)">
-              <div class="ticker-list-grid">
-                <label *ngFor="let inst of getInstrumentsByCategory(cat)" class="modern-checkbox">
-                  <input type="checkbox" [checked]="isTickerSelected(inst.symbol)" (change)="toggleTicker(inst.symbol)">
-                  <span class="checkbox-box"></span>
-                  <span class="inst-name">{{ inst.name }}</span>
-                  <span class="inst-symbol">{{ inst.symbol }}</span>
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style="margin-top: 20px; display: flex; align-items: center; justify-content: space-between;">
-          {{ tickerSaveError }}
-          <button class="btn-primary" (click)="saveTickerSettings()" [disabled]="tickerSaveError !== ''">
-            Save Selection
-          </button>
-        </div>
-      </div>
     </div>
-
   </div>
 
 </div>
